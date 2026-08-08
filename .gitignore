@@ -1,0 +1,10 @@
+*.fasl
+*.fasl.*
+*.lx64fsl
+*.dx64fsl
+*.core
+.direnv/
+result
+result-*
+coverage.sexp
+coverage-report/

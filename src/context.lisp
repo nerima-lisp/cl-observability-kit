@@ -1,15 +1,3 @@
-(in-package #:observability-kit)
-
-(defstruct (instrumentation-context
-            (:constructor %make-instrumentation-context
-                (trace-id span-id trace-flags attributes baggage))
-            (:conc-name %instrumentation-context-))
-  trace-id
-  span-id
-  trace-flags
-  attributes
-  baggage)
-
 (defun %validate-context-id (value what)
   (when value
     (unless (and (stringp value) (plusp (length value)) (<= (length value) 256))
@@ -105,19 +93,9 @@ Entries supplied by ATTRIBUTES take precedence over existing entries."
      (%normalize-attributes (append incoming existing))
      (%copy-alist (%instrumentation-context-baggage context)))))
 
-(defvar *instrumentation-context* nil
-  "Dynamically scoped current instrumentation context.")
-
 (defun current-instrumentation-context (&optional default)
   "Return the dynamically scoped context, or DEFAULT when none is bound."
   (or *instrumentation-context* default))
-
-(defmacro with-instrumentation-context ((context) &body body)
-  "Execute BODY with CONTEXT as the current instrumentation context."
-  `(let ((*instrumentation-context* (progn
-                                      (check-type ,context instrumentation-context)
-                                      ,context)))
-     ,@body))
 
 (defun capture-instrumentation-context (&optional (context *instrumentation-context*))
   "Return a detached copy of CONTEXT, or NIL when no context is active."
@@ -135,9 +113,3 @@ Entries supplied by ATTRIBUTES take precedence over existing entries."
   (check-type function function)
   (let ((*instrumentation-context* (capture-instrumentation-context context)))
     (funcall function)))
-
-(defmacro with-captured-instrumentation-context ((context) &body body)
-  "Execute BODY with a detached copy of CONTEXT dynamically bound."
-  `(call-with-captured-instrumentation-context
-    ,context
-    (lambda () ,@body)))

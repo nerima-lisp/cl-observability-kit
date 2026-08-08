@@ -1,24 +1,6 @@
-(in-package #:observability-kit/otlp)
-
 (defun %otlp-error (format-control &rest arguments)
   (error 'observability-error
          :message (apply #'format nil format-control arguments)))
-
-(defun %proper-list-p (object)
-  "Return true when OBJECT is a finite proper list."
-  (loop with slow = object
-        with fast = object
-        do (cond
-             ((null fast) (return t))
-             ((not (consp fast)) (return nil))
-             (t (setf fast (cdr fast))))
-           (cond
-             ((null fast) (return t))
-             ((not (consp fast)) (return nil))
-             (t (setf fast (cdr fast))))
-           (setf slow (if (consp slow) (cdr slow) slow))
-           (when (eq slow fast)
-             (return nil))))
 
 (defun %snapshot-list (source)
   (cond
@@ -26,7 +8,7 @@
     ((metric-p source) (list (metric-snapshot source)))
     ((metric-registry-p source) (metric-snapshot source))
     ((null source) nil)
-    ((%proper-list-p source)
+    ((observability-kit::%proper-list-p source)
      (unless (every #'metric-snapshot-p source)
        (%otlp-error "OTLP source lists must contain metric snapshots."))
      (sort (copy-list source) #'string< :key #'metric-snapshot-name))
@@ -128,8 +110,7 @@ with the application or another optional integration."
           (remove nil
                   (list (and scope-name (cons "name" scope-name))
                         (and scope-version (cons "version" scope-version))))))
-    (unless (every (lambda (pair)
-                     (and (stringp (car pair)) (stringp (cdr pair))))
+    (unless (every (lambda (pair) (stringp (cdr pair)))
                    scope)
       (%otlp-error "OTLP scope metadata must contain string values."))
     (list (cons "scope" scope)

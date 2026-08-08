@@ -18,12 +18,12 @@
                                       "line" slash slash "one"
                                       slash "n" "two" slash "r" "three"))
            (registry (make-metric-registry))
-           (zeta (define-gauge registry "zeta"
+           (zeta (define-gauge registry zeta
                    :help help
                    :unit "items"
                    :label-names '("route" "method")))
-           (alpha (define-counter registry "alpha_total" :help "Alpha"))
-           (histogram (define-histogram registry "latency_seconds"
+           (alpha (define-counter registry alpha_total :help "Alpha"))
+           (histogram (define-histogram registry latency_seconds
                          :help "Latency"
                          :buckets '(1 2))))
       (metric-set zeta 1
@@ -65,13 +65,13 @@
 (describe "export safety boundaries"
   (it "rejects sensitive label and context names before export"
     (let ((registry (make-metric-registry)))
-      (signals invalid-label-name
-        (define-counter registry "authorization_total"
+      (signals invalid-metric-name
+        (define-counter registry authorization_total
                         :label-names '("authorization")))
       (signals unsafe-attribute-name
         (make-instrumentation-context
          :attributes '(("access-token" . "secret"))))
-      (let ((metric (define-counter registry "safe_total"
+      (let ((metric (define-counter registry safe_total
                       :label-names '("route"))))
         (metric-inc metric 1 :labels '("route" "/health"))
         (let ((text (observability-kit/prometheus:render-prometheus registry)))

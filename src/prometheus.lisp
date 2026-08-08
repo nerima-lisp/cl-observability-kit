@@ -1,24 +1,6 @@
-(in-package #:observability-kit/prometheus)
-
 (defun %export-error (format-control &rest arguments)
   (error 'observability-error
          :message (apply #'format nil format-control arguments)))
-
-(defun %proper-list-p (object)
-  "Return true when OBJECT is a finite proper list."
-  (loop with slow = object
-        with fast = object
-        do (cond
-             ((null fast) (return t))
-             ((not (consp fast)) (return nil))
-             (t (setf fast (cdr fast))))
-           (cond
-             ((null fast) (return t))
-             ((not (consp fast)) (return nil))
-             (t (setf fast (cdr fast))))
-           (setf slow (if (consp slow) (cdr slow) slow))
-           (when (eq slow fast)
-             (return nil))))
 
 (defun %snapshot-list (source)
   (let ((snapshots
@@ -27,7 +9,7 @@
             ((metric-p source) (list (metric-snapshot source)))
             ((metric-registry-p source) (metric-snapshot source))
             ((null source) nil)
-            ((%proper-list-p source)
+            ((observability-kit::%proper-list-p source)
              (unless (every #'metric-snapshot-p source)
                (%export-error
                 "Prometheus source lists must contain metric snapshots."))
@@ -51,7 +33,7 @@
               (and (string= (car left) (car right))
                    (string< (cdr left) (cdr right)))))))
 
-(defun %write-escaped-string (string stream &key (escape-help-p nil))
+(defun %write-escaped-string (string stream &key escape-help-p)
   (loop for character across string
         do (cond
              ((char= character #\\)
@@ -70,7 +52,7 @@
               (write-char character stream))))
   stream)
 
-(defun %escaped-string (string &key (escape-help-p nil))
+(defun %escaped-string (string &key escape-help-p)
   (with-output-to-string (stream)
     (%write-escaped-string string stream :escape-help-p escape-help-p)))
 
@@ -96,19 +78,17 @@
                             (expt 5 (- scale fives))))
                  (digits (princ-to-string scaled))
                  (sign (if negative "-" "")))
-            (if (zerop scale)
-                (concatenate 'string sign digits)
-                (let ((split (- (length digits) scale)))
-                  (if (plusp split)
-                      (concatenate 'string sign
-                                   (subseq digits 0 split)
-                                   "."
-                                   (subseq digits split))
-                      (concatenate 'string sign
-                                   "0."
-                                   (make-string (- split)
-                                                :initial-element #\0)
-                                   digits))))))))))
+            (let ((split (- (length digits) scale)))
+              (if (plusp split)
+                  (concatenate 'string sign
+                               (subseq digits 0 split)
+                               "."
+                               (subseq digits split))
+                  (concatenate 'string sign
+                               "0."
+                               (make-string (- split)
+                                            :initial-element #\0)
+                               digits)))))))))
 
 (defun %normalize-float-number (string)
   (let ((trimmed (string-trim '(#\Space #\Tab #\Newline #\Return)

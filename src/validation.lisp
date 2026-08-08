@@ -1,10 +1,3 @@
-(in-package #:observability-kit)
-
-(defparameter *sensitive-name-fragments*
-  '("authorization" "access-token" "refresh-token" "token" "secret"
-    "password" "passwd" "cookie" "api-key" "apikey" "credential"
-    "private-key" "ssn" "email" "phone" "address"))
-
 (defun %copy-observability-value (value)
   "Copy mutable string values at an observability API boundary."
   (if (stringp value)
@@ -32,7 +25,7 @@ LISTP, LENGTH, or MAPCAR to signal an implementation-dependent type error."
              ((null fast) (return t))
              ((not (consp fast)) (return nil))
              (t (setf fast (cdr fast))))
-           (setf slow (if (consp slow) (cdr slow) slow))
+           (setf slow (cdr slow))
            (when (eq slow fast)
              (return nil))))
 
@@ -64,10 +57,13 @@ LISTP, LENGTH, or MAPCAR to signal an implementation-dependent type error."
 (defun %validate-metric-name (name)
   (let ((normalized (%designator-string name)))
     (unless (and normalized (%valid-name-p normalized :metric-p t)
-                 (not (uiop:string-prefix-p "__" normalized)))
+                 (not (uiop:string-prefix-p "__" normalized))
+                 (not (%sensitive-name-p normalized)))
       (error 'invalid-metric-name
              :name name
-             :message (format nil "Invalid metric name ~S." name)))
+             :message (format nil
+                              "Metric name ~S is invalid or reserved for sensitive data."
+                              name)))
     normalized))
 
 (defun %validate-label-name (name)
@@ -170,8 +166,9 @@ LISTP, LENGTH, or MAPCAR to signal an implementation-dependent type error."
                               name)))
     normalized))
 
-(defun %normalize-attributes (attributes &key (max-value-length 1024))
+(defun %normalize-attributes (attributes &key max-value-length)
   (let ((provided (%label-input-alist attributes))
+        (max-value-length (or max-value-length 1024))
         (seen (make-hash-table :test #'equal))
         (normalized nil))
     (dolist (pair provided)
@@ -200,11 +197,21 @@ LISTP, LENGTH, or MAPCAR to signal an implementation-dependent type error."
            :message (format nil "~A must be a real number, got ~S." what value)))
   value)
 
-(defun %validate-non-negative-real (value what)
+(defun %finite-float-p (value)
+  (and (= value value)
+       #+sbcl (not (sb-ext:float-infinity-p value))
+       #-sbcl t))
+
+(defun %finite-real-p (value)
+  (and (realp value)
+       (or (not (floatp value))
+           (%finite-float-p value))))
+
+(defun %validate-finite-real (value what)
   (%validate-real value what)
-  (when (minusp value)
+  (unless (%finite-real-p value)
     (error 'observability-error
-           :message (format nil "~A must not be negative, got ~S." what value)))
+           :message (format nil "~A must be finite, got ~S." what value)))
   value)
 
 (defun %validate-positive-integer (value what)

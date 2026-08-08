@@ -33,7 +33,7 @@ The following uses only the public core and Prometheus APIs:
 
 (defparameter *requests*
   (observability-kit:define-counter
-   *registry* "requests_total"
+   *registry* requests_total
    :help "Completed requests."
    :label-names '("method" "status")))
 
@@ -46,7 +46,9 @@ The following uses only the public core and Prometheus APIs:
 ```
 
 `define-gauge`, `define-histogram`, `metric-set`, `metric-observe`,
-`metric-snapshot`, and `registry-snapshot` follow the same public model.
+`metric-snapshot` follows the same public model. Metric definitions are
+macros and require a symbol so that invalid names and definition options fail
+at macroexpansion time.
 Unlabelled metrics expose an initial zero sample; labelled series are created
 when their complete label set is first updated.
 
@@ -165,6 +167,19 @@ Applications remain responsible for domain-specific metric names, deployment
 health checks, HTTP routes, exporter startup/shutdown, and provider-specific
 attributes.
 
+## Architecture and development
+
+The core deliberately separates metric/health data from operations and keeps
+transport concerns outside the package. Health execution uses a continuation
+chain internally so one check, timeout, or cancellation result cannot abort
+the remaining checks. See [the architecture notes](docs/architecture.md) for
+the ownership boundaries and extension points.
+
+The repository pins the current nerima-lisp dependency floors in the ASDF
+systems and provides a Nix development shell with `paredit-cli`. The optional
+systems remain independently loadable; loading the core does not load
+`cl-log-kit`, an HTTP client/server, or an exporter transport.
+
 ## Testing
 
 With the `nerima-lisp` repositories available to ASDF, run:
@@ -172,6 +187,19 @@ With the `nerima-lisp` repositories available to ASDF, run:
 ```lisp
 (asdf:test-system "cl-observability-kit")
 ```
+
+For a reproducible local run from the repository root:
+
+```sh
+sbcl --script run-tests.lisp
+sbcl --script run-coverage.lisp
+nix flake check
+```
+
+`run-coverage.lisp` asks cl-weave for expression and branch coverage with a
+100% minimum. Coverage artifacts are written under `coverage-report/` and
+`coverage.sexp`, both ignored by Git. The Nix shell also exposes the pinned
+`paredit-cli` used to validate and format the Lisp sources.
 
 The test system covers metric aggregation, validation, bounded cardinality,
 deterministic snapshots, Prometheus escaping, concurrent updates, health

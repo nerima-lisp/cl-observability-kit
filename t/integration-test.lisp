@@ -13,9 +13,9 @@
 (describe "OTLP-shaped export"
   (it "preserves zero and exact Common Lisp values at the adapter boundary"
     (let* ((registry (make-metric-registry))
-           (counter (define-counter registry "zero_total"))
-           (gauge (define-gauge registry "ratio"))
-           (histogram (define-histogram registry "latency"
+           (counter (define-counter registry zero_total))
+           (gauge (define-gauge registry ratio))
+           (histogram (define-histogram registry latency
                          :buckets '(1 2))))
       (declare (ignore counter))
       (metric-set gauge 0)
@@ -89,10 +89,10 @@
 (describe "public quick start"
   (it "uses only the public metric and exporter APIs"
     (let* ((registry (make-metric-registry))
-           (requests (define-counter registry "requests_total"
+           (requests (define-counter registry requests_total
                        :help "Requests"
                        :label-names '("method")))
-           (in-flight (define-gauge registry "in_flight")))
+           (in-flight (define-gauge registry in_flight)))
       (metric-inc requests 1 :labels '("method" "GET"))
       (metric-set in-flight 2)
       (let ((text (observability-kit/prometheus:render-prometheus registry)))

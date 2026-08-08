@@ -1,5 +1,3 @@
-(in-package #:observability-kit)
-
 (define-condition observability-error (error)
   ((message :initarg :message :reader observability-error-message))
   (:report (lambda (condition stream)

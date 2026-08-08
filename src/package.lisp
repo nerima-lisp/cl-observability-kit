@@ -35,14 +35,10 @@
    #:define-counter
    #:define-gauge
    #:define-histogram
-   #:make-counter
-   #:make-gauge
-   #:make-histogram
    #:metric-inc
    #:metric-set
    #:metric-observe
    #:metric-snapshot
-   #:registry-snapshot
    #:metric-snapshot-p
    #:metric-snapshot-name
    #:metric-snapshot-help

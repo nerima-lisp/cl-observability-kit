@@ -11,16 +11,16 @@
 (describe "metric aggregation"
   (it "supports counters, gauges, and exact histogram values"
     (let* ((registry (make-metric-registry))
-           (counter (define-counter registry "requests_total"
+           (counter (define-counter registry requests_total
                       :help "Requests" :unit "requests"))
-           (gauge (define-gauge registry "queue_depth"))
-           (histogram (define-histogram registry "request_latency"
+           (gauge (define-gauge registry queue_depth))
+           (histogram (define-histogram registry request_latency
                         :buckets '(1 5))))
       (signals observability-error
-        (define-histogram registry "invalid_buckets" :buckets 1))
+        (define-histogram registry invalid_buckets :buckets 1))
       (expect (metric-kind counter) :to-equal :counter)
       (expect (metric-inc counter 2) :to-equal 2)
-      (expect (metric-inc counter :amount 3) :to-equal 5)
+      (expect (metric-inc counter 3) :to-equal 5)
       (expect (metric-sample-value
                (sample-of (metric-snapshot counter)))
               :to-equal 5)
@@ -39,9 +39,17 @@
         (expect (metric-sample-sum sample) :to-equal 19/3)
         (expect (mapcar #'cdr buckets) :to-equal '(1 1 2)))))
 
+  (it-property "keeps counter increments exact"
+      ((left (gen-integer :min 0 :max 100))
+       (right (gen-integer :min 0 :max 100)))
+    (let* ((registry (make-metric-registry))
+           (counter (define-counter registry property_total)))
+      (expect (metric-inc counter left) :to-equal left)
+      (expect (metric-inc counter right) :to-equal (+ left right))))
+
   (it "normalizes labels and keeps label sets bounded"
     (let* ((registry (make-metric-registry :max-label-value-length 8))
-           (metric (define-counter registry "http_requests_total"
+           (metric (define-counter registry http_requests_total
                      :label-names '("route" "method"))))
       (metric-inc metric 1
                   :labels '(("route" . "/health") ("method" . "GET")))
@@ -54,18 +62,19 @@
                 :to-equal '(("method" . "GET") ("route" . "/health")))
         (expect (metric-sample-value sample) :to-equal 2))
       (signals invalid-label-name
-        (define-counter registry "invalid_labels"
+        (define-counter registry invalid_labels
                         :label-names '("bad-name")))
       (signals invalid-label-name
-        (define-counter registry "non_list_labels"
+        (define-counter registry non_list_labels
                         :label-names "route"))
       (signals invalid-label-name
-        (define-counter registry "dotted_label_names"
+        (define-counter registry dotted_label_names
                         :label-names (cons "route" "method")))
-      (signals observability-error
-        (define-counter registry "conflicting_label_options"
-                        :label-names '("route")
-                        :labels nil))
+      (signals program-error
+        (macroexpand-1
+         '(define-counter registry conflicting_label_options
+           :label-names ("route")
+           :labels nil)))
       (signals invalid-label-value
         (metric-inc metric 1
                     :labels '(("method" . "GET") ("route" . 42))))
@@ -74,12 +83,12 @@
       (signals invalid-label-set
         (metric-inc metric 1 :labels (cons "route" "/health")))
       (signals invalid-label-name
-        (define-counter registry "secret_labels"
+        (define-counter registry protected_labels
                         :label-names '("authorization")))))
 
   (it "rejects new label series after the cardinality limit"
     (let* ((registry (make-metric-registry))
-           (metric (define-gauge registry "worker_load"
+           (metric (define-gauge registry worker_load
                      :label-names '("worker")
                      :cardinality-limit 2)))
       (metric-set metric 1 :labels '("worker" "one"))
@@ -90,12 +99,12 @@
 
   (it "returns deterministic and detached registry snapshots"
     (let* ((registry (make-metric-registry))
-           (zeta (define-gauge registry "zeta" :label-names '("zone")))
-           (alpha (define-counter registry "alpha")))
+           (zeta (define-gauge registry zeta :label-names '("zone")))
+           (alpha (define-counter registry alpha)))
       (metric-set zeta 2 :labels '("zone" "b"))
       (metric-set zeta 1 :labels '("zone" "a"))
       (metric-inc alpha 4)
-      (let ((snapshots (registry-snapshot registry)))
+      (let ((snapshots (metric-snapshot registry)))
         (expect (mapcar #'metric-snapshot-name snapshots)
                 :to-equal '("alpha" "zeta"))
         (expect (mapcar #'metric-sample-labels
@@ -114,7 +123,7 @@
            (context-value (copy-seq "blue"))
            (help (copy-seq "Request count"))
            (unit (copy-seq "requests"))
-           (metric (define-counter registry (copy-seq "requests_total")
+           (metric (define-counter registry requests_total
                      :help help
                      :unit unit
                      :label-names (list name)))
@@ -128,7 +137,7 @@
             (char unit 0) #\x)
       (expect (string= "Request count" (metric-help metric)))
       (expect (string= "requests" (metric-unit metric)))
-      (let* ((snapshot (first (registry-snapshot registry)))
+      (let* ((snapshot (first (metric-snapshot registry)))
              (sample (first (metric-snapshot-samples snapshot))))
         (expect (= 1 (metric-sample-value sample)))
         (expect (string= "/health" (cdr (first (metric-sample-labels sample))))))
@@ -136,7 +145,7 @@
 
   (it "keeps concurrent counter updates lossless"
     (let* ((registry (make-metric-registry))
-           (counter (define-counter registry "concurrent_total"))
+           (counter (define-counter registry concurrent_total))
            (threads
              (loop repeat 4
                    collect
