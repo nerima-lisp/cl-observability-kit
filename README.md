@@ -50,6 +50,34 @@ The following uses only the public core and Prometheus APIs:
 Unlabelled metrics expose an initial zero sample; labelled series are created
 when their complete label set is first updated.
 
+## Health quick start
+
+Health checks are explicit observations. Register a check once, run the
+selected kind from the application's health route or scheduler, and map the
+returned status to the application's response:
+
+```lisp
+(defparameter *health* (observability-kit:make-health-registry))
+
+(observability-kit:register-health-check
+ *health* "database"
+ (lambda (cancellation-token)
+   (declare (ignore cancellation-token))
+   ;; Replace this with a bounded, cancellation-aware dependency probe.
+   t)
+ :kind :readiness)
+
+(observability-kit:run-health-checks *health* :kind :readiness)
+(observability-kit:health-status *health* :kind :readiness)
+;; => :HEALTHY after the successful run
+```
+
+`run-health-checks` returns independent result objects and records the last
+completed run. `health-status` only reads that recorded result; it never starts
+checks implicitly. Liveness, readiness, and startup are separate filters, so
+the application can expose them through different routes without coupling the
+registry to an HTTP server.
+
 ## Metrics and labels
 
 - Counters accept finite, non-negative real numbers.
