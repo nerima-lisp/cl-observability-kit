@@ -43,6 +43,12 @@
        (success
          (handler-case
              (progn
+               ;; Remove prior outputs so a failed run cannot validate stale
+               ;; coverage data or an old HTML report.
+               (when (probe-file coverage-output)
+                 (delete-file coverage-output))
+               (when (probe-file report-directory)
+                 (uiop:delete-directory-tree report-directory :validate t))
                (ensure-directories-exist report-directory)
                (unless coverage-source-pathnames
                  (error "Coverage source selection is empty."))

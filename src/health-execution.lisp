@@ -92,13 +92,13 @@ implementation and keeps timeout cleanup on the same path as normal results."
                                                :kind (health-check-kind check))
                     :duration (%health-duration-since clock started)))
           (let ((thread
-            (cl-concurrent-kit:make-thread
+                  (%start-health-thread
                    (lambda ()
                      (%invoke-health-check check child-token))
-                   :name (format nil "health-~A-~A"
-                                 (string-downcase
-                                  (symbol-name (health-check-kind check)))
-                                 (health-check-name check)))))
+                   (format nil "health-~A-~A"
+                           (string-downcase
+                            (symbol-name (health-check-kind check)))
+                           (health-check-name check)))))
             (multiple-value-bind (status value condition)
                 (%wait-for-health-thread
                  thread child-token clock (health-check-timeout check))

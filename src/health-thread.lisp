@@ -37,6 +37,9 @@
   (/ (- (%health-monotonic-time clock) started)
      internal-time-units-per-second))
 
+(defun %start-health-thread (worker name)
+  (cl-concurrent-kit:make-thread worker :name name))
+
 (defun %attempt-health-thread-operation (operation &rest arguments)
   "Call a thread cleanup OPERATION and return any error as a second value."
   (block attempt

@@ -9,7 +9,6 @@
                 #:observability-error
                 #:metric
                 #:metric-p
-                #:metric-registry
                 #:metric-registry-p
                 #:metric-snapshot
                 #:metric-snapshot-p
@@ -17,7 +16,6 @@
                 #:metric-snapshot-help
                 #:metric-snapshot-type
                 #:metric-snapshot-unit
-                #:metric-snapshot-label-names
                 #:metric-snapshot-samples
                 #:metric-sample-labels
                 #:metric-sample-value

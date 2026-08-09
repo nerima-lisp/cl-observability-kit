@@ -72,10 +72,6 @@ with `--strict` and also asserts that `index.html` was produced. A local
 checkout can run the equivalent command directly when MkDocs Material is
 installed:
 
-```sh
-mkdocs build --strict -f docs/mkdocs.yml
-```
-
 ## Source layout
 
 The core source is split by responsibility: metric model, definition,
