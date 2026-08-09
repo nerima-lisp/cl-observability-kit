@@ -85,10 +85,12 @@
   :pathname "t"
   :serial t
   :components ((:file "package")
+               (:file "edge-fixtures")
                (:file "core-test")
                (:file "prometheus-test")
                (:file "integration-test")
-               (:file "edge-test"))
+               (:file "edge-test")
+               (:file "health-edge-test"))
   :perform (asdf:test-op (operation component)
              (declare (ignore operation component))
              (let* ((suite (uiop:symbol-call '#:cl-weave '#:root-suite))

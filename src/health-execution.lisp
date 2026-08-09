@@ -33,77 +33,73 @@
       (let ((value (funcall (health-check-function check) token)))
         (values (if value :pass :fail) value nil)))))
 
+(defun %health-cancellation-condition (check status)
+  (case status
+    (:timeout
+     (make-condition 'health-check-timeout
+                     :check-name (health-check-name check)
+                     :kind (health-check-kind check)))
+    (:cancelled
+     (make-condition 'health-check-cancelled
+                     :check-name (health-check-name check)
+                     :kind (health-check-kind check)))))
+
+(defun %health-result-for-status (check status clock started
+                                  &key value condition)
+  (make-health-result
+   :name (health-check-name check)
+   :kind (health-check-kind check)
+   :status status
+   :value value
+   :condition condition
+   :duration (%health-duration-since clock started)))
+
+(defun %health-thread-name (check)
+  (format nil "health-~A-~A"
+          (string-downcase (symbol-name (health-check-kind check)))
+          (health-check-name check)))
+
+(defun %health-result-after-thread
+    (check thread child-token status value condition clock started)
+  (case status
+    ((:pass :fail)
+     (%health-result-for-status check status clock started
+                                :value value
+                                :condition condition))
+    ((:timeout :cancelled)
+     (%health-result-for-status
+      check status clock started
+      :condition (or (%stop-health-thread thread child-token check status)
+                     (%health-cancellation-condition check status))))))
+
+(defun %cancelled-health-result (check clock started)
+  (%health-result-for-status
+   check :cancelled clock started
+   :condition (%health-cancellation-condition check :cancelled)))
+
 (defun %run-health-check (check parent-token clock continuation)
   "Run CHECK and pass one isolated result to CONTINUATION.
 
-The continuation is the only exit from the worker boundary.  Keeping it
+The continuation is the only exit from the worker boundary. Keeping it
 explicit makes the ordered registry reduction independent from the check
 implementation and keeps timeout cleanup on the same path as normal results."
-  (labels ((finish-thread-result (thread child-token status value condition started)
-             (funcall
-              continuation
-              (case status
-                ((:pass :fail)
-                 (make-health-result
-                  :name (health-check-name check)
-                  :kind (health-check-kind check)
-                  :status status
-                  :value value
-                  :condition condition
-                  :duration (%health-duration-since clock started)))
-                (:timeout
-                 (let ((stop-condition
-                         (%stop-health-thread thread child-token check :timeout)))
-                   (make-health-result
-                    :name (health-check-name check)
-                    :kind (health-check-kind check)
-                    :status :timeout
-                    :condition (or stop-condition
-                                   (make-condition 'health-check-timeout
-                                                   :check-name
-                                                   (health-check-name check)
-                                                   :kind
-                                                   (health-check-kind check)))
-                    :duration (%health-duration-since clock started))))
-                (:cancelled
-                 (let ((stop-condition
-                         (%stop-health-thread thread child-token check :cancelled)))
-                   (make-health-result
-                    :name (health-check-name check)
-                    :kind (health-check-kind check)
-                    :status :cancelled
-                    :condition (or stop-condition
-                                   (make-condition 'health-check-cancelled
-                                                   :check-name
-                                                   (health-check-name check)
-                                                   :kind
-                                                   (health-check-kind check)))
-                    :duration (%health-duration-since clock started))))))))
-    (let* ((started (%health-monotonic-time clock))
-           (child-token (make-cancellation-token :parent parent-token)))
-      (if (cancellation-requested-p parent-token)
-          (funcall continuation
-                   (make-health-result
-                    :name (health-check-name check)
-                    :kind (health-check-kind check)
-                    :status :cancelled
-                    :condition (make-condition 'health-check-cancelled
-                                               :check-name (health-check-name check)
-                                               :kind (health-check-kind check))
-                    :duration (%health-duration-since clock started)))
-          (let ((thread
-                  (%start-health-thread
-                   (lambda ()
-                     (%invoke-health-check check child-token))
-                   (format nil "health-~A-~A"
-                           (string-downcase
-                            (symbol-name (health-check-kind check)))
-                           (health-check-name check)))))
-            (multiple-value-bind (status value condition)
-                (%wait-for-health-thread
-                 thread child-token clock (health-check-timeout check))
-              (finish-thread-result
-               thread child-token status value condition started)))))))
+  (let* ((started (%health-monotonic-time clock))
+         (child-token (make-cancellation-token :parent parent-token)))
+    (if (cancellation-requested-p parent-token)
+        (funcall continuation
+                 (%cancelled-health-result check clock started))
+        (let ((thread
+                (%start-health-thread
+                 (lambda ()
+                   (%invoke-health-check check child-token))
+                 (%health-thread-name check))))
+          (multiple-value-bind (status value condition)
+              (%wait-for-health-thread
+               thread child-token clock (health-check-timeout check))
+            (funcall continuation
+                     (%health-result-after-thread
+                      check thread child-token status value condition
+                      clock started)))))))
 
 (defun %store-health-results (registry results)
   (cl-concurrent-kit:with-lock-held ((%health-registry-lock registry))
