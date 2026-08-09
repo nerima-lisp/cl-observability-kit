@@ -27,10 +27,12 @@ only when they are needed:
 ;; (asdf:load-system "cl-observability-kit/log-kit")
 ```
 
-The core has no HTTP, network exporter, or `cl-log-kit` dependency. The
-Prometheus system renders text, the OTLP system returns transport-neutral
-Common Lisp data, and the `/log-kit` system maps context fields into the
-existing `cl-log-kit` context.
+The core has no HTTP client/server, network exporter, or `cl-log-kit`
+dependency. It does provide span lifecycle, context propagation, structured
+log records, and HTTP semantic-convention helpers. The Prometheus system
+renders text, the OTLP system returns transport-neutral Common Lisp data, and
+the `/log-kit` system maps context fields into the existing `cl-log-kit`
+context.
 
 ## Record a metric
 
@@ -118,3 +120,66 @@ Do not place credentials, raw headers, personal information, or unbounded
 user-controlled values in labels or context attributes. Validation rejects
 common sensitive names, but callers remain responsible for classification and
 redaction.
+
+## Record a span and correlated log
+
+Create one provider per application boundary, then create tracers for the
+instrumentation scopes that use it. The exporter callback receives a detached
+`span-record` when a recorded span ends; it can hand that record to an
+application exporter or to the OTLP adapter.
+
+```lisp
+(let ((exported nil))
+  (let* ((provider
+           (observability-kit:make-tracer-provider
+            :resource
+            (observability-kit:make-resource
+             :attributes '(("service.name" . "orders")))
+            :exporter (lambda (record) (push record exported))))
+         (tracer (observability-kit:make-tracer provider "orders")))
+    (observability-kit:with-span (root tracer "GET /orders" :kind :server)
+      (observability-kit:span-set-http-request
+       root "GET" :route "/orders" :scheme "https")
+      (observability-kit:make-log-record
+       :severity :info :body "request started")
+      (observability-kit:span-set-http-response root 200))
+    (observability-kit:shutdown-tracer-provider provider)
+    exported))
+```
+
+`with-span` binds the current span and instrumentation context, records a
+condition as an exception on error, and ends the span on every exit path. Use
+`:parent nil` for an explicit root span or pass a span/context as `:parent`
+for a detached parent.
+
+## Propagate across a boundary
+
+Propagation is an explicit boundary operation. Headers are string-keyed
+alists; unrelated headers are copied and existing W3C fields are replaced.
+
+```lisp
+(let* ((outgoing
+         (observability-kit:inject-trace-context
+          (observability-kit:current-instrumentation-context)
+          '(("user-agent" . "orders-client"))))
+       (incoming (observability-kit:extract-trace-context outgoing)))
+  incoming)
+```
+
+`traceparent`, `tracestate`, and `baggage` are validated at the trusted
+boundary. Malformed incoming optional fields are ignored while a valid
+`traceparent` is retained; callers should still apply their own trust and
+redaction policy.
+
+## Convert detached records
+
+Load `cl-observability-kit/otlp` when an application needs OTLP-shaped data:
+
+```lisp
+(observability-kit/otlp:span-record->otlp span-record)
+(observability-kit/otlp:log-record->otlp log-record)
+(observability-kit/otlp:traces->otlp span-records)
+```
+
+These functions return deterministic Common Lisp alists for an adapter. They
+do not perform serialization, retries, batching, or network I/O.

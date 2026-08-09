@@ -34,23 +34,29 @@ series cannot race another operation for the same metric."
     `(let ((,metric-variable ,metric)
            (,labels-variable ,labels))
        (cl-concurrent-kit:with-lock-held ((%metric-lock ,metric-variable))
-         (let ((,series
-                 (or (gethash ,labels-variable (%metric-series ,metric-variable))
-                     (when (>= (hash-table-count (%metric-series ,metric-variable))
-                               (%metric-cardinality-limit ,metric-variable))
-                       (error 'metric-cardinality-exceeded
-                              :name (%metric-name ,metric-variable)
-                              :limit (%metric-cardinality-limit ,metric-variable)
-                              :labels ,labels-variable
-                              :message (format nil
-                                               "Metric ~S exceeded its cardinality limit of ~D."
-                                               (%metric-name ,metric-variable)
-                                               (%metric-cardinality-limit ,metric-variable))))
-                     (setf (gethash ,labels-variable
-                                    (%metric-series ,metric-variable))
-                           (%empty-series (%metric-kind ,metric-variable)
-                                          (%metric-histogram-buckets ,metric-variable)
-                                          ,labels-variable)))))
+         (let ((,series (gethash ,labels-variable
+                                 (%metric-series ,metric-variable))))
+           (unless ,series
+             (when (>= (hash-table-count (%metric-series ,metric-variable))
+                       (%metric-cardinality-limit ,metric-variable))
+               (error 'metric-cardinality-exceeded
+                      :name (%metric-name ,metric-variable)
+                      :limit (%metric-cardinality-limit ,metric-variable)
+                      :labels ,labels-variable
+                      :message (format nil
+                                       "Metric ~S exceeded its cardinality limit of ~D."
+                                       (%metric-name ,metric-variable)
+                                       (%metric-cardinality-limit ,metric-variable))))
+             (setf ,series
+                   (%empty-series (%metric-kind ,metric-variable)
+                                  (%metric-histogram-buckets ,metric-variable)
+                                  ,labels-variable))
+             (setf (gethash ,labels-variable (%metric-series ,metric-variable))
+                   ,series)
+             (setf (%metric-series-order ,metric-variable)
+                   (%insert-metric-series
+                    (%metric-series-order ,metric-variable)
+                    ,series)))
            ,@body)))))
 
 (defmacro define-counter (registry name &rest options)

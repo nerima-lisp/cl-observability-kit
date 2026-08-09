@@ -59,3 +59,44 @@
 (define-condition health-check-cancelled (health-error)
   ()
   (:default-initargs :message "The health check was cancelled."))
+
+(define-condition tracing-error (observability-error)
+  ())
+
+(define-condition invalid-span-name (tracing-error)
+  ((name :initarg :name :reader invalid-span-name-name))
+  (:default-initargs :message "Invalid span name."))
+
+(define-condition tracer-provider-shutdown (tracing-error)
+  ((provider :initarg :provider :reader tracer-provider-shutdown-provider))
+  (:default-initargs :message "The tracer provider has been shut down."))
+
+(define-condition span-operation-error (tracing-error)
+  ((span :initarg :span :reader span-operation-error-span)
+   (operation :initarg :operation :reader span-operation-error-operation))
+  (:default-initargs :message "The span operation is not valid."))
+
+(define-condition logging-error (observability-error)
+  ())
+
+(define-condition invalid-log-severity (logging-error)
+  ((severity :initarg :severity :reader invalid-log-severity-severity))
+  (:default-initargs :message "Invalid log severity."))
+
+(define-condition propagation-error (observability-error)
+  ())
+
+(define-condition invalid-traceparent (propagation-error)
+  ((header :initarg :header :reader invalid-traceparent-header))
+  (:default-initargs :message "The W3C traceparent header is invalid."))
+
+(define-condition http-error (observability-error)
+  ())
+
+(define-condition invalid-http-method (http-error)
+  ((method :initarg :method :reader invalid-http-method-method))
+  (:default-initargs :message "The HTTP method is invalid."))
+
+(define-condition invalid-http-status (http-error)
+  ((status :initarg :status :reader invalid-http-status-status))
+  (:default-initargs :message "The HTTP status code is invalid."))

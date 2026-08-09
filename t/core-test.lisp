@@ -126,13 +126,16 @@
            (alpha (define-counter registry alpha)))
       (metric-set zeta 2 :labels '("zone" "b"))
       (metric-set zeta 1 :labels '("zone" "a"))
+      (metric-set zeta 3 :labels '("zone" "c"))
       (metric-inc alpha 4)
       (let ((snapshots (metric-snapshot registry)))
         (expect (mapcar #'metric-snapshot-name snapshots)
                 :to-equal '("alpha" "zeta"))
         (expect (mapcar #'metric-sample-labels
                         (metric-snapshot-samples (second snapshots)))
-                :to-equal '((("zone" . "a")) (("zone" . "b")))))
+                :to-equal '((("zone" . "a"))
+                             (("zone" . "b"))
+                             (("zone" . "c")))))
         (let ((detached (metric-snapshot zeta)))
           (metric-set zeta 7 :labels '("zone" "a"))
           (expect (metric-sample-value
@@ -193,6 +196,7 @@
               (cdr samples) nil)
         (expect (metric-snapshot-name snapshot) :to-equal "snapshot_boundary")
         (expect (metric-snapshot-help snapshot) :to-equal "Latency")
+        (expect (metric-snapshot-type snapshot) :to-equal :histogram)
         (expect (metric-snapshot-unit snapshot) :to-equal "seconds")
         (expect (metric-snapshot-label-names snapshot) :to-equal '("route"))
         (expect (length (metric-snapshot-samples snapshot)) :to-equal 1)
@@ -202,6 +206,11 @@
         (expect (cdr (first (metric-sample-buckets
                              (first (metric-snapshot-samples snapshot)))))
                 :to-equal 1))))
+
+  (it "leaves non-samples unchanged in the defensive copy helper"
+    (let ((value (list :not-a-sample)))
+      (expect (eq value (observability-kit::%copy-metric-sample value))
+              :to-be-truthy)))
 
   (it "keeps concurrent counter updates lossless"
     (let* ((registry (make-metric-registry))

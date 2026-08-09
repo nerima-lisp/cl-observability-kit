@@ -20,8 +20,21 @@
                               value))))
   value)
 
+(defun %validate-tracestate (value)
+  (when value
+    (unless (and (stringp value)
+                 (plusp (length value))
+                 (<= (length value) 4096)
+                 (not (find-if (lambda (character)
+                                 (or (char= character #\Return)
+                                     (char= character #\Linefeed)))
+                               value)))
+      (error 'observability-error
+             :message "TRACESTATE must be a non-empty string of at most 4096 characters without line breaks.")))
+  (%copy-observability-value value))
+
 (defun make-instrumentation-context (&key trace-id span-id trace-flags
-                                          attributes baggage)
+                                          attributes baggage tracestate)
   "Create immutable instrumentation metadata without starting a span.
 
 TRACE-ID and SPAN-ID are opaque identifiers.  ATTRIBUTES and BAGGAGE are
@@ -32,7 +45,8 @@ be exported or handed to another integration."
    (%validate-context-id span-id "SPAN-ID")
    (%validate-trace-flags trace-flags)
    (%normalize-attributes attributes)
-   (%normalize-attributes baggage)))
+   (%normalize-attributes baggage)
+   (%validate-tracestate tracestate)))
 
 (defun instrumentation-context-trace-id (context)
   (check-type context instrumentation-context)
@@ -53,6 +67,10 @@ be exported or handed to another integration."
 (defun instrumentation-context-baggage (context)
   (check-type context instrumentation-context)
   (%copy-alist (%instrumentation-context-baggage context)))
+
+(defun instrumentation-context-tracestate (context)
+  (check-type context instrumentation-context)
+  (%copy-observability-value (%instrumentation-context-tracestate context)))
 
 (defun context-attribute (context name &optional default)
   "Return the value for NAME in CONTEXT attributes, or DEFAULT.
@@ -78,7 +96,8 @@ be exported or handed to another integration."
      (%instrumentation-context-span-id context)
      (%instrumentation-context-trace-flags context)
      (%normalize-attributes (acons normalized value attributes))
-     (%copy-alist (%instrumentation-context-baggage context)))))
+     (%copy-alist (%instrumentation-context-baggage context))
+     (%instrumentation-context-tracestate context))))
 
 (defun context-with-attributes (context attributes)
   "Return CONTEXT with validated ATTRIBUTES merged over existing values.
@@ -95,7 +114,8 @@ Entries supplied by ATTRIBUTES take precedence over existing entries."
      (%instrumentation-context-span-id context)
      (%instrumentation-context-trace-flags context)
      (%normalize-attributes (append incoming existing))
-     (%copy-alist (%instrumentation-context-baggage context)))))
+     (%copy-alist (%instrumentation-context-baggage context))
+     (%instrumentation-context-tracestate context))))
 
 (defun current-instrumentation-context (&optional default)
   "Return the dynamically scoped context, or DEFAULT when none is bound."
@@ -110,7 +130,8 @@ Entries supplied by ATTRIBUTES take precedence over existing entries."
      (%instrumentation-context-span-id context)
      (%instrumentation-context-trace-flags context)
      (%copy-alist (%instrumentation-context-attributes context))
-     (%copy-alist (%instrumentation-context-baggage context)))))
+     (%copy-alist (%instrumentation-context-baggage context))
+     (%instrumentation-context-tracestate context))))
 
 (defun call-with-captured-instrumentation-context (context function)
   "Call FUNCTION with a detached CONTEXT dynamically bound."

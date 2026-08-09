@@ -53,13 +53,14 @@
                :message (format nil "Label ~S is required." name))))
     (sort normalized #'string< :key #'car)))
 
-(defun %validate-attribute-name (name)
+(defun %validate-attribute-name (name &key allow-sensitive-names)
   (let ((normalized (%designator-string name)))
     (unless (and normalized (plusp (length normalized)))
       (error 'unsafe-attribute-name
              :name name
              :message "Attribute names must be non-empty strings or symbols."))
-    (when (%sensitive-name-p normalized)
+    (when (and (%sensitive-name-p normalized)
+               (not (member normalized allow-sensitive-names :test #'string=)))
       (error 'unsafe-attribute-name
              :name name
              :message (format nil
@@ -67,13 +68,16 @@
                               name)))
     normalized))
 
-(defun %normalize-attributes (attributes &key max-value-length)
+(defun %normalize-attributes (attributes &key max-value-length
+                                         allow-sensitive-names)
   (let ((provided (%label-input-alist attributes))
         (max-value-length (or max-value-length 1024))
         (seen (make-hash-table :test #'equal))
         (normalized nil))
     (dolist (pair provided)
-      (let ((name (%validate-attribute-name (car pair)))
+      (let ((name (%validate-attribute-name
+                    (car pair)
+                    :allow-sensitive-names allow-sensitive-names))
             (value (cdr pair)))
         (when (gethash name seen)
           (error 'unsafe-attribute-name

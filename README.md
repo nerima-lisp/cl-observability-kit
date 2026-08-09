@@ -1,9 +1,10 @@
 # cl-observability-kit
 
-`cl-observability-kit` is a small, deterministic observability substrate for
-Common Lisp. It targets SBCL through `cl-concurrent-kit` and keeps metrics,
-health semantics, and instrumentation context separate from HTTP, logging,
-span lifecycle, and network transport.
+`cl-observability-kit` is a deterministic observability foundation for Common
+Lisp. It provides metrics, health checks, resource metadata, distributed
+tracing, structured logs, W3C context propagation, and HTTP semantic
+conventions while remaining transport-neutral. Applications still own HTTP
+clients and servers, logger sinks, wire encoding, and network exporter I/O.
 
 ## Quick Start
 
@@ -22,7 +23,14 @@ span lifecycle, and network transport.
 
 Metric definitions require symbol names and labelled updates require the
 complete declared label set. See [Getting started](docs/src/getting-started.md)
-for health checks and the optional systems.
+for health checks, tracing, propagation, structured logs, and the optional
+systems.
+
+The same core can create a resource and tracer provider, record nested spans,
+attach HTTP attributes, create a correlated log record, and inject or extract
+W3C headers. The `observability-kit/otlp` package converts metric snapshots,
+span records, and log records into detached OTLP-shaped Common Lisp data; it
+does not open a connection or encode a wire payload.
 
 ## Install
 

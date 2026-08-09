@@ -1,15 +1,17 @@
 # Architecture
 
 `cl-observability-kit` is the small, transport-neutral layer between an
-application and its observability integrations. It owns stable data and
-aggregation semantics. It does not own HTTP routes, network connections,
-logger handlers, span lifecycles, or deployment policy.
+application and its observability integrations. It owns validated telemetry
+data, aggregation semantics, context propagation, and the lifecycle of
+detached trace and log records. It does not own HTTP routes or clients,
+network connections, logger handlers or sinks, wire encoding, or deployment
+policy.
 
 ## Systems and boundaries
 
 | System | Owns | Does not own |
 | --- | --- | --- |
-| `cl-observability-kit` | metric data, aggregation, validation, cardinality limits, health semantics, cancellation tokens, instrumentation metadata | HTTP, logging, spans, network I/O |
+| `cl-observability-kit` | metric data, aggregation, validation, cardinality limits, health semantics, cancellation tokens, resources, tracer/provider/span lifecycle, structured logs, W3C propagation, HTTP semantic conventions | HTTP I/O, logger handlers and sinks, wire encoding, network I/O |
 | `cl-observability-kit/prometheus` | deterministic Prometheus text rendering and escaping | an HTTP server or `/metrics` route |
 | `cl-observability-kit/otlp` | deterministic OTLP-shaped Common Lisp data | JSON/protobuf encoding, an OTLP client, export retries |
 | `cl-observability-kit/log-kit` | explicit context-field mapping to `cl-log-kit` | log records, handlers, sinks, formatting, span lifecycle |
@@ -26,8 +28,11 @@ input because it is followed by the nerima-lisp dependency graph, but it is
 not a direct source dependency here. Optional systems add only the integration
 they need.
 
-Health registries also declare the monotonic clock's units-per-second scale, so
-custom clocks do not inherit an implicit SBCL timing unit.
+Health registries and tracer providers accept injected clocks, so custom
+clocks do not inherit an implicit SBCL timing unit. Tracer providers also
+accept ID generators, samplers, exporter callbacks, and explicit flush and
+shutdown callbacks; the application owns the concrete exporter and its
+transport lifecycle.
 
 ## Data and logic
 
@@ -51,9 +56,22 @@ The source layout keeps the primary data model separate from operations:
   continuation boundary.
 - `health-status.lisp` computes aggregate status without starting checks.
 - `health-macros.lisp` provides the macro-first health definition API.
+- `resource-declarations.lisp` and `resource.lisp` define immutable resource
+  metadata shared by metric, trace, and log records.
+- `trace-model.lisp` and `trace-operation.lisp` define tracer providers,
+  instrumentation scopes, spans, lifecycle callbacks, and detached span
+  records.
+- `propagation.lisp` formats and validates W3C `traceparent`, `tracestate`,
+  and `baggage` values without performing I/O.
+- `log-operation.lisp` creates detached structured log records correlated with
+  instrumentation context.
+- `http.lisp` validates HTTP semantic-convention attributes and attaches them
+  to an existing span; it does not implement an HTTP client or server.
 - `prometheus-source.lisp` selects and snapshots exporter input.
 - `prometheus-format.lisp` normalizes numbers and escapes exposition text.
 - `prometheus-samples.lisp` emits labels, samples, and histogram buckets.
+- `otlp.lisp` converts detached metric, span, and log records to deterministic
+  OTLP-shaped Common Lisp data.
 
 Metric definitions are macros because names and options are configuration, not
 runtime input. `define-counter`, `define-gauge`, and `define-histogram` reject
@@ -80,7 +98,9 @@ no implicit float conversion in the core.
 Instrumentation context bindings are thread-local. Worker threads do not
 inherit a caller's dynamic context implicitly; use
 `with-captured-instrumentation-context` at an explicit worker boundary when
-context propagation is desired.
+context propagation is desired. `inject-trace-context` and
+`extract-trace-context` provide the W3C header boundary; the application owns
+the carrier and its network transport.
 
 ## Health execution
 
@@ -110,10 +130,14 @@ failure affects service admission.
 
 ## Export and security boundaries
 
-Snapshots are the stable hand-off format for exporters. Prometheus output
-sorts metric and label data, emits cumulative histogram buckets, and escapes
-label/help/unit text. The OTLP system is similarly transport-neutral. Neither
-system starts a client or server.
+Snapshots and detached span/log records are the stable hand-off format for
+exporters. Prometheus output sorts metric and label data, emits cumulative
+histogram buckets, and escapes label/help/unit text. OTLP conversion preserves
+resource and instrumentation-scope metadata in deterministic Common Lisp
+data. Ending a recorded span invokes the configured export callback; explicit
+flush and shutdown callbacks provide lifecycle boundaries. None of these
+operations starts an HTTP client/server, opens a connection, or starts a
+network thread.
 
 Do not put personal information, tokens, credentials, authorization values,
 raw headers, or unbounded user input into metric labels or instrumentation

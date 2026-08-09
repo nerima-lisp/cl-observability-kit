@@ -17,5 +17,7 @@
             :observability-attributes
             (instrumentation-context-attributes ,context-var)
             :observability-baggage
-            (instrumentation-context-baggage ,context-var))
+            (instrumentation-context-baggage ,context-var)
+            :observability-tracestate
+            (instrumentation-context-tracestate ,context-var))
          ,@body))))

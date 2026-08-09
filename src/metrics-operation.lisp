@@ -25,10 +25,13 @@
     (values labels labels-supplied-p)))
 
 (defun %normalized-operation-labels (metric labels)
-  (%normalize-labels (%metric-label-names metric)
-                     labels
-                     (%metric-registry-max-label-value-length
-                      (%metric-registry metric))))
+  (if (and (null labels)
+           (null (%metric-label-names metric)))
+      nil
+      (%normalize-labels (%metric-label-names metric)
+                         labels
+                         (%metric-registry-max-label-value-length
+                          (%metric-registry metric)))))
 
 (defun %validate-operation-value (metric operation value what)
   (handler-case
@@ -96,9 +99,12 @@ The optional positional amount defaults to one.  The only option is
     (%with-metric-series (series metric normalized-labels)
       (incf (%metric-series-count series))
       (incf (%metric-series-sum series) observation)
-      (loop for bucket in (%metric-histogram-buckets metric)
-            for index from 0
-            when (<= observation bucket)
-              do (incf (nth index (%metric-series-bucket-counts series))))
-      (incf (car (last (%metric-series-bucket-counts series))))
+      (let* ((buckets (%metric-histogram-buckets metric))
+             (counts (%metric-series-bucket-counts series)))
+        (let ((count-cell counts))
+          (dolist (bucket buckets)
+            (when (<= observation bucket)
+              (incf (car count-cell)))
+            (setf count-cell (cdr count-cell)))
+          (incf (car count-cell))))
       observation)))

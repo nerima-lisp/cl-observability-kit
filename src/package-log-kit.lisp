@@ -12,7 +12,8 @@
                 #:instrumentation-context-span-id
                 #:instrumentation-context-trace-flags
                 #:instrumentation-context-attributes
-                #:instrumentation-context-baggage)
+                #:instrumentation-context-baggage
+                #:instrumentation-context-tracestate)
   (:export #:instrumentation-context-log-fields
            #:with-log-kit-context
            #:call-with-log-kit-context))

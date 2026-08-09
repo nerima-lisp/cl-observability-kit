@@ -98,6 +98,8 @@
                          :buckets '(1 2))))
       (expect (metric-inc counter 2 :labels '(method "GET")) :to-equal 2)
       (expect (metric-inc counter :labels '((method . "GET"))) :to-equal 3)
+      (signals invalid-label-set
+        (metric-inc counter))
       (expect (metric-inc gauge -1) :to-equal -1)
       (expect (metric-set gauge 3/2) :to-equal 3/2)
       (expect (metric-set gauge 1.5d0) :to-equal 1.5d0)
@@ -153,6 +155,10 @@
       (make-instrumentation-context :trace-flags 256))
     (signals observability-error
       (make-instrumentation-context :trace-flags "invalid"))
+    (signals observability-error
+      (make-instrumentation-context :tracestate 42))
+    (signals observability-error
+      (make-instrumentation-context :tracestate ""))
     (signals unsafe-attribute-name
       (make-instrumentation-context :attributes '(("access-token" . "hidden"))))
     (signals unsafe-attribute-name
@@ -274,6 +280,18 @@
                (list (second (metric-snapshot registry))
                      (first (metric-snapshot registry))))
               :to-be-truthy)
+      (expect (observability-kit/prometheus:render-prometheus
+               (list (observability-kit::make-metric-snapshot
+                      :name "custom"
+                      :help "custom"
+                      :type :custom
+                      :samples nil)))
+              :to-equal
+              (concatenate 'string
+                           "# HELP custom custom"
+                           (string #\Newline)
+                           "# TYPE custom custom"
+                           (string #\Newline)))
       (signals observability-error
         (observability-kit/prometheus:render-prometheus
          (let ((snapshot (first (metric-snapshot registry))))
@@ -281,6 +299,66 @@
       (expect (observability-kit/prometheus::%sorted-labels
                '(("b" . "x") ("a" . "y") ("a" . "x")))
               :to-equal '(("a" . "x") ("a" . "y") ("b" . "x")))
+      (expect (with-output-to-string (stream)
+                (observability-kit/prometheus::%write-labels
+                 '(("b" . "x") ("a" . "y")) stream))
+              :to-equal "{a=\"y\",b=\"x\"}")
+      (expect (observability-kit/prometheus::%histogram-labels
+               '(("z" . "last") ("a" . "first"))
+               2)
+              :to-equal '(("a" . "first") ("le" . "2") ("z" . "last")))
+      (expect (observability-kit/prometheus::%histogram-labels
+               '(("a" . "first") ("z" . "last") ("zz" . "later"))
+               2)
+              :to-equal '(("a" . "first")
+                          ("le" . "2")
+                          ("z" . "last")
+                          ("zz" . "later")))
+      (expect (observability-kit/prometheus::%histogram-labels
+               '(("a" . "first"))
+               2)
+              :to-equal '(("a" . "first") ("le" . "2")))
+      (expect (observability-kit/prometheus::%histogram-labels
+               '(("a" . "first"))
+               observability-kit::+infinity+)
+              :to-equal '(("a" . "first") ("le" . "+Inf")))
+      (signals observability-error
+        (observability-kit/prometheus::%histogram-labels
+         '(("le" . "input"))
+         2))
+      (expect (with-output-to-string (stream)
+                (observability-kit/prometheus::%write-histogram-sample-line
+                 "histogram_bucket"
+                 '(("a" . "first") ("z" . "last"))
+                 2
+                 3
+                 stream))
+              :to-equal
+              (concatenate 'string
+                           "histogram_bucket{a=\"first\",le=\"2\",z=\"last\"} 3"
+                           (string #\Newline)))
+      (expect (with-output-to-string (stream)
+                (observability-kit/prometheus::%write-histogram-sample-line
+                 "histogram_bucket"
+                 '(("z" . "middle") ("zz" . "last"))
+                 2
+                 3
+                 stream))
+              :to-equal
+              (concatenate 'string
+                           "histogram_bucket{le=\"2\",z=\"middle\",zz=\"last\"} 3"
+                           (string #\Newline)))
+      (expect (with-output-to-string (stream)
+                (observability-kit/prometheus::%write-histogram-sample-line
+                 "histogram_bucket"
+                 '(("a" . "first"))
+                 2
+                 3
+                 stream))
+              :to-equal
+              (concatenate 'string
+                           "histogram_bucket{a=\"first\",le=\"2\"} 3"
+                           (string #\Newline)))
       (expect (observability-kit/prometheus::%escaped-string "plain")
               :to-equal "plain")
       (expect (with-output-to-string (stream)
@@ -293,6 +371,16 @@
               :to-equal "1.5000000000000000")
       (expect (observability-kit/prometheus::%normalize-float-number "1.0d0")
               :to-equal "1.0e0")
+      (expect (observability-kit/prometheus::%normalize-float-number
+               (format nil "~C~C~C~C1.0D0~C~C~C~C"
+                       #\Space #\Tab #\Newline #\Return
+                       #\Return #\Newline #\Tab #\Space))
+              :to-equal "1.0e0")
+      (expect (observability-kit/prometheus::%normalize-float-number
+               (format nil "~C~C~C~C~C~C~C~C"
+                       #\Space #\Tab #\Newline #\Return
+                       #\Return #\Newline #\Tab #\Space))
+              :to-equal "")
       (expect (observability-kit/prometheus::%number-string
                observability-kit::+infinity+)
               :to-equal "+Inf")
@@ -370,7 +458,8 @@
                           :observability-span-id nil
                           :observability-trace-flags nil
                           :observability-attributes nil
-                          :observability-baggage nil))
+                          :observability-baggage nil
+                          :observability-tracestate nil))
       (expect (observability-kit/log-kit:call-with-log-kit-context
                context (lambda () :called))
               :to-equal :called)

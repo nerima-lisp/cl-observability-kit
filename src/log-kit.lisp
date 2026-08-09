@@ -18,7 +18,9 @@ span, own a logger, or change log-kit's record, handler, or sink semantics."
         :observability-attributes
         (instrumentation-context-attributes context)
         :observability-baggage
-        (instrumentation-context-baggage context)))
+        (instrumentation-context-baggage context)
+        :observability-tracestate
+        (instrumentation-context-tracestate context)))
 
 (defun call-with-log-kit-context (context function)
   "Call FUNCTION with CONTEXT fields bound in LOG-KIT's dynamic context."

@@ -91,10 +91,12 @@
                           kind registry normalized-name normalized-help normalized-unit
                           normalized-label-names normalized-limit
                           (make-hash-table :test #'equal)
+                          nil
                           (cl-concurrent-kit:make-lock :name normalized-name)
                           normalized-buckets)))
              (when (null normalized-label-names)
-               (setf (gethash nil (%metric-series metric))
-                     (%empty-series kind normalized-buckets nil)))
+               (let ((series (%empty-series kind normalized-buckets nil)))
+                 (setf (gethash nil (%metric-series metric)) series
+                       (%metric-series-order metric) (list series))))
              (setf (gethash normalized-name (%metric-registry-metrics registry)) metric)
              metric)))))))

@@ -33,6 +33,22 @@ does not specify one inherits DEFAULT-CARDINALITY-LIMIT."
           #'string<
           :key #'%metric-name)))
 
+(defun %insert-metric-series (series-order series)
+  "Insert SERIES into the normalized label order used by snapshots."
+  (let ((labels (%metric-series-labels series)))
+    (if (or (null series-order)
+            (%labels-less-p labels
+                            (%metric-series-labels (first series-order))))
+        (cons series series-order)
+        (loop for tail on series-order
+              for next = (cdr tail)
+              when (or (null next)
+                       (%labels-less-p
+                        labels
+                        (%metric-series-labels (car next))))
+                do (setf (cdr tail) (cons series next))
+                   (return series-order)))))
+
 (defun metric-name (metric)
   (check-type metric metric)
   (%copy-observability-value (%metric-name metric)))

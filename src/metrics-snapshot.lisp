@@ -3,26 +3,30 @@
     nil)
 
 (defun %snapshot-series (metric series)
-  (%make-metric-sample
-   (%copy-alist (%metric-series-labels series))
-   (unless (histogram-p metric)
-     (%metric-series-value series))
-   (when (histogram-p metric)
-     (%metric-series-count series))
-   (when (histogram-p metric)
-     (%metric-series-sum series))
-   (when (histogram-p metric)
-     (loop for boundary in (append (%metric-histogram-buckets metric)
-                                   (list +infinity+))
-           for count in (%metric-series-bucket-counts series)
-            collect (cons boundary count)))))
+  (let ((histogram-p (histogram-p metric)))
+    (%make-metric-sample
+     (%copy-alist (%metric-series-labels series))
+     (unless histogram-p
+       (%metric-series-value series))
+     (when histogram-p
+       (%metric-series-count series))
+     (when histogram-p
+       (%metric-series-sum series))
+       (when histogram-p
+         (let ((count-cell (%metric-series-bucket-counts series))
+               (samples nil))
+           (dolist (boundary (%metric-histogram-buckets metric))
+             (push (cons boundary (car count-cell)) samples)
+             (setf count-cell (cdr count-cell)))
+           (nreverse
+            (cons (cons +infinity+ (car count-cell))
+                  samples)))))))
 
 (defun %snapshot-metric (metric)
   (cl-concurrent-kit:with-lock-held ((%metric-lock metric))
-    (let ((series (sort (loop for series being the hash-values of (%metric-series metric)
-                              collect series)
-                        #'%labels-less-p
-                        :key #'%metric-series-labels)))
+    ;; Series order is maintained when a series is created, so snapshots do
+    ;; not repeatedly collect and sort the metric's hash-table values.
+    (let ((series (%metric-series-order metric)))
       (make-metric-snapshot
        :name (%copy-observability-value (%metric-name metric))
        :help (%copy-observability-value (%metric-help metric))

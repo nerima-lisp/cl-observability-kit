@@ -3,43 +3,73 @@
     nil)
 
 (defun %write-metric (snapshot stream)
-  (let ((name (metric-snapshot-name snapshot)))
-    (format stream "# HELP ~A ~A~%"
-            name
-            (%escaped-string (metric-snapshot-help snapshot)
-                             :escape-help-p t))
-    (format stream "# TYPE ~A ~(~A~)~%"
-            name
-            (metric-snapshot-type snapshot))
-    (when (metric-snapshot-unit snapshot)
-      (format stream "# UNIT ~A ~A~%"
-              name
-              (%escaped-string (metric-snapshot-unit snapshot)
-                               :escape-help-p t)))
-    (dolist (sample (metric-snapshot-samples snapshot))
+  (let* ((name (observability-kit::%metric-snapshot-name snapshot))
+         (help (observability-kit::%metric-snapshot-help snapshot))
+         (type (observability-kit::%metric-snapshot-type snapshot))
+         (unit (observability-kit::%metric-snapshot-unit snapshot))
+         (histogram-p (eq type :histogram))
+         (type-name (case type
+                      (:counter "counter")
+                      (:gauge "gauge")
+                      (:histogram "histogram")
+                      (otherwise (string-downcase (symbol-name type))))))
+    (write-string "# HELP " stream)
+    (write-string name stream)
+    (write-char #\Space stream)
+    (%write-escaped-string help stream :escape-help-p t)
+    (terpri stream)
+    (write-string "# TYPE " stream)
+    (write-string name stream)
+    (write-char #\Space stream)
+    (write-string type-name stream)
+    (terpri stream)
+    (when unit
+      (write-string "# UNIT " stream)
+      (write-string name stream)
+      (write-char #\Space stream)
+      (%write-escaped-string unit stream :escape-help-p t)
+      (terpri stream))
+    (dolist (sample (observability-kit::%metric-snapshot-samples snapshot))
       (unless (metric-sample-p sample)
         (%export-error "Metric ~S contains an invalid sample." name))
-      (if (eq (metric-snapshot-type snapshot) :histogram)
-          (progn
-            (dolist (bucket (metric-sample-buckets sample))
-              (%write-sample-line (concatenate 'string name "_bucket")
-                                  (%histogram-labels
-                                   (metric-sample-labels sample)
-                                   (car bucket))
-                                  (cdr bucket)
-                                  stream))
-            (%write-sample-line (concatenate 'string name "_sum")
-                                (metric-sample-labels sample)
-                                (metric-sample-sum sample)
-                                stream)
-            (%write-sample-line (concatenate 'string name "_count")
-                                (metric-sample-labels sample)
-                                (metric-sample-count sample)
-                                stream))
-          (%write-sample-line name
-                              (metric-sample-labels sample)
-                              (metric-sample-value sample)
-                              stream)))))
+      (let ((labels (%sorted-labels
+                     (observability-kit::%metric-sample-labels sample))))
+        (if histogram-p
+            (progn
+              (let ((buckets (observability-kit::%metric-sample-buckets sample)))
+                (when buckets
+                  (let ((bucket (first buckets)))
+                    (%write-histogram-sample-line name
+                                                   labels
+                                                   (car bucket)
+                                                   (cdr bucket)
+                                                   stream
+                                                   :name-suffix "_bucket")
+                    (dolist (bucket (rest buckets))
+                      (%write-histogram-sample-line name
+                                                     labels
+                                                     (car bucket)
+                                                     (cdr bucket)
+                                                     stream
+                                                     :name-suffix "_bucket"
+                                                     :labels-le-validated-p t)))))
+              (%write-sample-line name
+                                  labels
+                                  (observability-kit::%metric-sample-sum sample)
+                                  stream
+                                  :labels-sorted-p t
+                                  :name-suffix "_sum")
+              (%write-sample-line name
+                                  labels
+                                  (observability-kit::%metric-sample-count sample)
+                                  stream
+                                  :labels-sorted-p t
+                                  :name-suffix "_count"))
+            (%write-sample-line name
+                                labels
+                                (observability-kit::%metric-sample-value sample)
+                                stream
+                                :labels-sorted-p t))))))
 
 (defun render-prometheus (source &key stream)
   "Render SOURCE as deterministic Prometheus text exposition.

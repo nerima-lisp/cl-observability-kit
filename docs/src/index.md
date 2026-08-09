@@ -1,29 +1,31 @@
 # cl-observability-kit
 
-`cl-observability-kit` is a small, deterministic observability substrate for
-Common Lisp applications and libraries. The core owns stable metrics, health
-semantics, and instrumentation metadata while applications own routes,
-exporter lifecycle, logging, and span lifecycle.
+`cl-observability-kit` is a deterministic observability foundation for Common
+Lisp applications and libraries. The core owns validated, detached telemetry
+data and lifecycle semantics while applications choose the HTTP stack, logger
+sinks, wire encoders, and network exporters.
 
 ## Systems
 
 | ASDF system | Responsibility |
 | --- | --- |
-| `cl-observability-kit` | Metrics, labels, registries, snapshots, health checks, cancellation tokens, and instrumentation context. |
+| `cl-observability-kit` | Metrics, health checks, resources, tracer/provider/span lifecycle, structured log records, W3C propagation, HTTP semantic conventions, and instrumentation context. |
 | `cl-observability-kit/prometheus` | Deterministic Prometheus text exposition. |
-| `cl-observability-kit/otlp` | Deterministic, transport-neutral OTLP-shaped Common Lisp data. It does not encode JSON/protobuf or send anything. |
+| `cl-observability-kit/otlp` | Deterministic, transport-neutral OTLP-shaped metric, trace, and log data. It does not encode JSON/protobuf or send anything. |
 | `cl-observability-kit/log-kit` | Optional bridge from instrumentation context to `cl-log-kit`'s existing log context. |
 
 ## Boundaries
 
-There is intentionally no HTTP system in the core. `/metrics`, `/health`,
-`/ready`, and `/live` routes, HTTP server lifecycle, and any `cl-http-kit`
-adapter belong to the application boundary. The exporter systems can be used
-with any HTTP stack or without HTTP at all.
+There is intentionally no HTTP client or server in the core. `/metrics`,
+`/health`, `/ready`, and `/live` routes, HTTP server lifecycle, and any
+framework adapter belong to the application boundary. The HTTP API in the core
+only validates and attaches semantic-convention attributes to an existing
+span.
 
-The core also does not create spans, start exporter clients, encode wire
-formats, or choose provider-specific attributes. Its snapshots and OTLP-shaped
-values are hand-off data for an integration chosen by the application.
+The core does not start exporter clients, encode wire formats, or choose
+provider-specific transport policy. Ending a recorded span invokes the
+configured exporter callback with a detached span record; flush and shutdown
+callbacks make the lifecycle explicit without creating network threads.
 
 ## Start here
 

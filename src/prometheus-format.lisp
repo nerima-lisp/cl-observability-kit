@@ -2,12 +2,25 @@
     (in-package #:observability-kit/prometheus)
     nil)
 
+(defun %label-less-p (left right)
+  (or (string< (car left) (car right))
+      (and (string= (car left) (car right))
+           (string< (cdr left) (cdr right)))))
+
+(defun %sort-labels (labels)
+  (sort labels #'%label-less-p))
+
+(defun %labels-sorted-p (labels)
+  (loop for tail on labels
+        for left = (first tail)
+        for right = (second tail)
+        while right
+        always (not (%label-less-p right left))))
+
 (defun %sorted-labels (labels)
-  (sort (copy-list labels)
-        (lambda (left right)
-          (or (string< (car left) (car right))
-              (and (string= (car left) (car right))
-                   (string< (cdr left) (cdr right)))))))
+  (if (%labels-sorted-p labels)
+      labels
+      (%sort-labels (copy-list labels))))
 
 (defun %write-escaped-string (string stream &key escape-help-p)
   (loop for character across string
@@ -66,15 +79,28 @@
                                             :initial-element #\0)
                                digits)))))))))
 
+(defun %float-whitespace-p (character)
+  (member character '(#\Space #\Tab #\Newline #\Return) :test #'char=))
+
 (defun %normalize-float-number (string)
-  (let ((trimmed (string-trim '(#\Space #\Tab #\Newline #\Return)
-                              string)))
-    (with-output-to-string (stream)
-      (loop for character across trimmed
-            do (write-char (if (member character '(#\d #\D))
-                               #\e
-                               character)
-                            stream)))))
+  (let ((start 0)
+        (end (length string)))
+    (loop while (and (< start end)
+                     (%float-whitespace-p (char string start)))
+          do (incf start))
+    (loop while (and (< start end)
+                     (%float-whitespace-p (char string (1- end))))
+          do (decf end))
+    (let ((normalized (make-string (- end start))))
+      (loop for source-index from start below end
+            for target-index from 0
+            for character = (char string source-index)
+            do (setf (char normalized target-index)
+                     (if (or (char= character #\d)
+                             (char= character #\D))
+                         #\e
+                         character)))
+      normalized)))
 
 (defun %number-string (value)
   (cond
@@ -90,3 +116,12 @@
      (%normalize-float-number (format nil "~,17G" value)))
     (t
      (%export-error "Metric value ~S is not a supported real number." value))))
+
+(defun %write-number (value stream)
+  (cond
+    ((eq value +infinity+)
+     (write-string "+Inf" stream))
+    ((integerp value)
+     (princ value stream))
+    (t
+     (write-string (%number-string value) stream))))

@@ -24,8 +24,55 @@
                 #:metric-sample-sum
                 #:metric-sample-buckets
                 #:metric-sample-p
+                #:resource-attributes
+                #:span-record
+                #:span-record-p
+                #:span-record-trace-id
+                #:span-record-span-id
+                #:span-record-parent-span-id
+                #:span-record-name
+                #:span-record-kind
+                #:span-record-start-time
+                #:span-record-end-time
+                #:span-record-duration
+                #:span-record-status
+                #:span-record-status-message
+                #:span-record-trace-flags
+                #:span-record-sampled-p
+                #:span-record-recording-p
+                #:span-record-attributes
+                #:span-record-events
+                #:span-record-links
+                #:span-record-resource
+                #:span-record-tracer-name
+                #:span-record-tracer-version
+                #:span-record-tracer-schema-url
+                #:span-event-name
+                #:span-event-timestamp
+                #:span-event-attributes
+                #:span-link-context
+                #:span-link-attributes
+                #:instrumentation-context-trace-id
+                #:instrumentation-context-span-id
+                #:instrumentation-context-trace-flags
+                #:log-record
+                #:log-record-p
+                #:log-record-timestamp
+                #:log-record-severity-text
+                #:log-record-severity-number
+                #:log-record-body
+                #:log-record-attributes
+                #:log-record-context
+                #:log-record-resource
+                #:log-record-scope-name
+                #:log-record-scope-version
+                #:log-record-scope-schema-url
                 #:proper-list-p
                 #:+infinity+)
   (:export #:metric-snapshot->otlp
            #:snapshot->otlp
-           #:registry->otlp))
+           #:registry->otlp
+           #:span-record->otlp
+           #:traces->otlp
+           #:log-record->otlp
+           #:logs->otlp))

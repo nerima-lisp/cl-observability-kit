@@ -4,13 +4,14 @@
 
 (defstruct (instrumentation-context
             (:constructor %make-instrumentation-context
-                (trace-id span-id trace-flags attributes baggage))
+                (trace-id span-id trace-flags attributes baggage tracestate))
             (:conc-name %instrumentation-context-))
   trace-id
   span-id
   trace-flags
   attributes
-  baggage)
+  baggage
+  tracestate)
 
 (defvar *instrumentation-context* nil
   "Dynamically scoped current instrumentation context.")

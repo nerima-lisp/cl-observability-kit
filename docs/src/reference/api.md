@@ -6,7 +6,8 @@ integration packages. The exported names are declared in `src/package.lisp`.
 ## Core package
 
 Use the `observability-kit` package (also available as `cl-observability-kit`)
-for metrics, health, context, and shared conditions.
+for metrics, health, resources, tracing, structured logs, propagation, HTTP
+semantic conventions, context, and shared conditions.
 
 ### Metrics
 
@@ -59,7 +60,7 @@ Cancellation is explicit through `make-cancellation-token`,
 
 | Operation | Purpose |
 | --- | --- |
-| `make-instrumentation-context &key trace-id span-id trace-flags attributes baggage` | Create validated, sorted metadata without starting a span. |
+| `make-instrumentation-context &key trace-id span-id trace-flags attributes baggage tracestate` | Create validated, sorted metadata without starting a span. |
 | `context-attribute context name &optional default` | Read one attribute. |
 | `context-with-attribute context name value` | Return a context with one attribute override. |
 | `context-with-attributes context attributes` | Return a context with merged attributes. |
@@ -70,8 +71,66 @@ Cancellation is explicit through `make-cancellation-token`,
 | `with-captured-instrumentation-context` | Macro form of the captured-context boundary. |
 
 Context accessors expose trace and span identifiers, trace flags, attributes,
-and baggage. Context creation and updates reject common sensitive attribute
-names; they do not replace application-level redaction.
+tracestate, and baggage. Context creation and updates reject common sensitive
+attribute names; they do not replace application-level redaction.
+
+### Resources and tracing
+
+| Operation | Purpose |
+| --- | --- |
+| `make-resource &key attributes` | Create immutable service/process metadata shared by emitted records. |
+| `make-tracer-provider &rest option-list` | Create a provider. Options include `:resource`, `:clock`, `:id-generator`, `:sampler`, `:exporter`, `:flush`, `:shutdown`, and `:export-error-handler`. |
+| `make-tracer provider name &rest option-list` | Create an instrumentation scope with optional `:version` and `:schema-url`. |
+| `start-span tracer name &rest option-list` | Start a span. Options include `:parent`, `:kind`, `:attributes`, and `:start-time`; `:parent` defaults to the current span. |
+| `end-span span &rest option-list` | End a span and export a detached record when it is recorded. Options include `:end-time`, `:status`, and `:status-message`. |
+| `with-span (variable tracer name &rest options) &body body` | Dynamically bind a span/context, record errors as exceptions, and end the span on every exit path. |
+| `force-flush-tracer-provider provider` / `shutdown-tracer-provider provider` | Invoke the configured exporter lifecycle callbacks. |
+
+Span operations include `span-set-attribute`, `span-add-event`,
+`span-add-link`, `span-set-status`, and `span-record-exception`. Accessors
+expose span identity, parent, kind, timing, status, recording/sampling state,
+attributes, events, links, and the immutable `span-context`. A sampler can
+drop a span, record it without sampling, or record and sample it. The core
+generates IDs and invokes callbacks but does not create network exporters.
+
+### Structured logs
+
+`make-log-record &rest option-list` creates a detached structured log record.
+Options include `:timestamp`, `:severity`, `:severity-number`, `:body`,
+`:attributes`, `:context`, `:resource`, `:scope-name`, `:scope-version`, and
+`:scope-schema-url`. The context defaults to the current instrumentation
+context; pass `:context nil` for an explicitly uncorrelated record. Record
+accessors expose timestamp, severity, body, attributes, context, resource, and
+instrumentation-scope metadata.
+
+### W3C propagation
+
+| Operation | Purpose |
+| --- | --- |
+| `format-traceparent context` / `parse-traceparent header` | Format or validate a W3C `traceparent` value. |
+| `format-baggage context` / `parse-baggage header` | Format or parse normalized W3C baggage members. |
+| `inject-trace-context context headers` | Return a copied string-keyed header alist with `traceparent`, `tracestate`, and `baggage` replaced. |
+| `extract-trace-context headers` | Return a validated context or `nil`; malformed untrusted values are ignored at this boundary. |
+
+Propagation never performs I/O. `make-instrumentation-context` accepts
+`:tracestate` in addition to trace and span IDs, flags, attributes, and
+baggage.
+
+### HTTP semantic conventions
+
+The HTTP API attaches validated semantic-convention attributes to an existing
+span; it is not an HTTP client or server:
+
+| Operation | Purpose |
+| --- | --- |
+| `http-request-attributes method &rest option-list` | Return request attributes for method, route, URL, scheme, addresses/ports, user agent, body size, and protocol version. |
+| `http-response-attributes status &rest option-list` | Return response attributes for status and body size. |
+| `span-set-http-request span method &rest option-list` | Attach request attributes to a span. |
+| `span-set-http-response span status &rest option-list` | Attach response attributes to a span. |
+
+The generic span attribute validator continues to reject common sensitive
+names. Only the standard address keys accepted by the HTTP helper use its
+explicit internal validation path.
 
 ## Integration packages
 
@@ -86,10 +145,12 @@ escapes label, HELP, and UNIT text. `le` is reserved for histogram buckets.
 ### `observability-kit/otlp`
 
 Load `cl-observability-kit/otlp` for `metric-snapshot->otlp`,
-`snapshot->otlp`, and `registry->otlp`. These return deterministic Common Lisp
+`snapshot->otlp`, `registry->otlp`, `span-record->otlp`, `traces->otlp`,
+`log-record->otlp`, and `logs->otlp`. These return deterministic Common Lisp
 alists shaped for an OTLP adapter. They do not encode JSON or protobuf, open a
-connection, or perform retries. `registry->otlp` accepts optional string
-`scope-name` and `scope-version` metadata.
+connection, or perform retries. Metric conversion accepts optional string
+`scope-name` and `scope-version` metadata; trace and log conversion preserves
+resource and instrumentation-scope data from the detached records.
 
 ### `observability-kit/log-kit`
 
@@ -103,6 +164,9 @@ spans.
 
 The core exports `observability-error`, `validation-error`, metric validation
 and operation conditions, cardinality and definition-conflict conditions,
-`unsafe-attribute-name`, `health-error`, `health-check-timeout`, and
-`health-check-cancelled`. Callers can handle these conditions at the boundary
-where an invalid update, failed probe, or cancellation should be reported.
+`unsafe-attribute-name`, `health-error`, `health-check-timeout`,
+`health-check-cancelled`, tracing conditions, logging conditions, propagation
+conditions, and HTTP conditions such as `invalid-http-method` and
+`invalid-http-status`. Callers can handle these conditions at the boundary
+where invalid input, failed probes, export failures, or cancellation should be
+reported.

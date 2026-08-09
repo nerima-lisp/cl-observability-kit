@@ -42,6 +42,10 @@ src/health-declarations.lisp
 src/health-macros.lisp
 src/context-declarations.lisp
 src/context-macros.lisp
+src/resource-declarations.lisp
+src/trace-declarations.lisp
+src/trace-macros.lisp
+src/log-declarations.lisp
 src/log-kit-macros.lisp
 src/package-prometheus.lisp
 src/package-otlp.lisp
@@ -57,6 +61,22 @@ report is the review artifact; the raw file may include dependency pathnames
 and must not be treated as application telemetry. Set
 `CL_WEAVE_PROPERTY_TESTS` and `CL_WEAVE_PROPERTY_SEED` to reproduce property
 tests.
+
+## Performance checks
+
+Run the repeatable SBCL workload benchmark and allocation profile from the
+repository root:
+
+```sh
+nix develop --command sbcl --script scripts/performance-benchmark.lisp
+nix develop --command sbcl --script scripts/performance-profile.lisp
+```
+
+The benchmark reports elapsed time and allocated bytes for metric updates,
+snapshots, Prometheus exposition, OTLP conversion, and context capture. It
+also checks that the exporter workloads produce non-empty Prometheus and OTLP
+outputs. Compare runs on the same implementation and machine; the profile is
+an allocation hotspot signal, not a substitute for functional tests.
 
 ## Documentation checks
 
@@ -81,10 +101,13 @@ find -L result -type f -size +0c -print | rg -m 1 .
 
 The core source is split by responsibility: metric model, definition,
 operation, and snapshot files; health model, registry, thread, and execution
-files; context and optional adapter files. Prometheus source selection,
-formatting, and sample emission are separate files. Tests live in `t/` and are
-loaded through the `cl-observability-kit/test` system.
+files; context, resource, trace, propagation, structured-log, and HTTP
+semantic-convention files. Prometheus source selection, formatting, and
+sample emission are separate files, as are OTLP conversion and the optional
+`cl-log-kit` bridge. Tests live in `t/` and are loaded through the
+`cl-observability-kit/test` system.
 
 When public semantics change, update the API and architecture pages together
-with the README entry point. Keep HTTP routes, exporter lifecycle, and
-provider-specific policy in the application that integrates this package.
+with the README entry point. Keep HTTP clients and servers, wire encoding,
+network exporter lifecycle, logger sinks, and provider-specific policy in the
+application that integrates this package.

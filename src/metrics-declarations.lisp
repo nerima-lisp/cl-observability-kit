@@ -19,7 +19,7 @@
 (defstruct (metric
             (:constructor %make-metric
                 (kind registry name help unit label-names cardinality-limit
-                 series lock histogram-buckets))
+                 series series-order lock histogram-buckets))
             (:conc-name %metric-))
   kind
   registry
@@ -29,6 +29,7 @@
   label-names
   cardinality-limit
   series
+  series-order
   lock
   histogram-buckets)
 
