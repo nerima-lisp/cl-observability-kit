@@ -8,3 +8,5 @@ result
 result-*
 coverage.sexp
 coverage-report/
+
+.worktrees/
