@@ -181,6 +181,11 @@ tool (the executable is `paredit`). The optional systems remain independently
 loadable; loading the core does not load
 `cl-log-kit`, an HTTP client/server, or an exporter transport.
 
+Dynamic instrumentation context bindings are thread-local; a newly created
+worker does not inherit the caller's current context. Capture and install it
+explicitly at the worker boundary with
+`with-captured-instrumentation-context` when propagation is intended.
+
 ## Testing
 
 With the `nerima-lisp` repositories available to ASDF, run:
@@ -202,6 +207,32 @@ nix flake check
 `coverage.sexp`, both ignored by Git. The Nix shell also exposes the pinned
 `paredit-cli` as `paredit` for read-only structural validation and analysis;
 `nix fmt` runs the configured formatter.
+
+The raw `coverage.sexp` is a cl-weave/SBCL artifact and may include pathnames
+for loaded dependencies. Use the filtered `coverage-report/` output and the
+explicit source policy above as the repository acceptance boundary; do not
+publish the raw file as application telemetry.
+
+The 100% threshold applies to the executable runtime files explicitly included
+by `run-coverage.lisp`. Declaration and macro-expansion files are intentionally
+excluded from SBCL runtime instrumentation because their behavior is exercised
+through compile/load and public-boundary tests. The excluded files are:
+
+```text
+src/package.lisp
+src/conditions.lisp
+src/validation-data.lisp
+src/metrics-declarations.lisp
+src/metrics-macros.lisp
+src/health-declarations.lisp
+src/context-declarations.lisp
+src/context-macros.lisp
+src/log-kit-macros.lisp
+```
+
+This is a documented coverage boundary, not a claim that every source form is
+runtime-instrumented. The test runner also rejects an empty test selection, so
+a vacuous green coverage run is not accepted.
 
 The test system covers metric aggregation, validation, bounded cardinality,
 deterministic snapshots, Prometheus escaping, concurrent updates, health

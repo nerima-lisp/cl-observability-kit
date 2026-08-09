@@ -159,6 +159,46 @@
                (sample-of (metric-snapshot counter)))
               :to-equal 4000))))
 
+  (it "keeps concurrent gauge and histogram updates exact"
+    (let* ((registry (make-metric-registry))
+           (gauge (define-gauge registry concurrent_gauge))
+           (histogram (define-histogram registry concurrent_histogram))
+           (threads
+             (loop repeat 4
+                   collect
+                   (cl-concurrent-kit:make-thread
+                    (lambda ()
+                      (loop repeat 1000
+                            do (progn
+                                 (metric-inc gauge)
+                                 (metric-observe histogram 1))))))))
+      (dolist (thread threads)
+        (cl-concurrent-kit:join-thread thread))
+      (let ((gauge-sample (sample-of (metric-snapshot gauge)))
+            (histogram-sample (sample-of (metric-snapshot histogram))))
+        (expect (metric-sample-value gauge-sample) :to-equal 4000)
+        (expect (metric-sample-count histogram-sample) :to-equal 4000)
+        (expect (metric-sample-sum histogram-sample) :to-equal 4000))))
+
+  (it "keeps cardinality bounded under concurrent series creation"
+    (let* ((registry (make-metric-registry :default-cardinality-limit 2))
+           (counter (define-counter registry concurrent_labels_total
+                      :label-names '(worker)))
+           (threads
+             (loop for worker in '("a" "b" "c" "d")
+                   collect
+                   (let ((label worker))
+                     (cl-concurrent-kit:make-thread
+                      (lambda ()
+                        (handler-case
+                            (metric-inc counter
+                                        :labels (list 'worker label))
+                          (metric-cardinality-exceeded () nil))))))))
+      (dolist (thread threads)
+        (cl-concurrent-kit:join-thread thread))
+      (expect (length (metric-snapshot-samples (metric-snapshot counter)))
+              :to-equal 2)))
+
 (describe "health checks"
   (it "isolates failures and reports an aggregate status"
     (let ((registry (make-health-registry)))
@@ -204,6 +244,11 @@
                 :to-equal :unknown)
         (expect (health-status registry :kind :startup)
                 :to-equal :unknown))
+      (let ((results (run-health-checks registry :kind :readiness)))
+        (expect (length results) :to-equal 1)
+        (expect (health-result-kind (first results)) :to-equal :readiness)
+        (expect (health-status registry :kind :readiness)
+                :to-equal :healthy))
       (let ((results (run-health-checks registry :kind :startup)))
         (expect (length results) :to-equal 1)
         (expect (health-result-kind (first results)) :to-equal :startup)

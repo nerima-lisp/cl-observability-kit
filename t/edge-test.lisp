@@ -138,6 +138,9 @@
       (expect (metric-set gauge 3/2) :to-equal 3/2)
       (expect (metric-set gauge 1.5d0) :to-equal 1.5d0)
       (expect (metric-observe histogram 3/2) :to-equal 3/2)
+      #+sbcl
+      (signals metric-operation-error
+        (metric-set gauge sb-ext:double-float-positive-infinity))
       (signals metric-operation-error (metric-set gauge "not-real"))
       (signals type-error (metric-snapshot :not-a-metric))
       (signals metric-operation-error (metric-inc counter -1 :labels '(method "GET")))

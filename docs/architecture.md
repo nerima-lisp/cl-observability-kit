@@ -19,6 +19,12 @@ lifecycle, and provider-specific attributes. This keeps the core useful for a
 library as well as for a service and prevents an integration package from
 silently becoming an application framework.
 
+The Nix closure spells out the pinned `cl-concurrent-kit` transitive
+dependencies used by the nerima-lisp build graph. That makes the development
+environment reproducible without making `cl-date-kit` or `cl-boundary-kit`
+runtime dependencies of the core ASDF system. Optional systems add only the
+integration they need.
+
 ## Data and logic
 
 The source layout keeps the primary data model separate from operations:
@@ -55,6 +61,11 @@ cardinality limit signals a condition instead of growing an unbounded table.
 Metric values remain Common Lisp numbers until an exporter boundary; there is
 no implicit float conversion in the core.
 
+Instrumentation context bindings are thread-local. Worker threads do not
+inherit a caller's dynamic context implicitly; use
+`with-captured-instrumentation-context` at an explicit worker boundary when
+context propagation is desired.
+
 ## Health execution
 
 Health checks are filtered by kind (`:liveness`, `:readiness`, or `:startup`)
@@ -87,3 +98,21 @@ raw headers, or unbounded user input into metric labels or instrumentation
 attributes. The validator rejects common sensitive names, but callers must
 still classify and redact values because no generic validator can recognize
 every secret.
+
+## Verification and coverage boundary
+
+`run-coverage.lisp` passes explicit include and exclude pathnames to cl-weave
+and requires 100% expression and branch coverage for the executable runtime
+files. The excluded declaration and macro-expansion files are
+`package.lisp`, `conditions.lisp`, `validation-data.lisp`,
+`metrics-declarations.lisp`, `metrics-macros.lisp`, `health-declarations.lisp`,
+`context-declarations.lisp`, `context-macros.lisp`, and `log-kit-macros.lisp`.
+Those files are still covered by compilation/loading, public API tests, and
+boundary tests; the reported 100% is intentionally not a claim about every
+source form. The test command uses a fail-closed empty-test policy so coverage
+cannot pass with no selected tests.
+
+The raw `coverage.sexp` is an implementation artifact of cl-weave and SBCL and
+may contain loaded dependency pathnames. The filtered `coverage-report/`
+output and the explicit source policy above are the acceptance boundary; the
+raw artifact is not application telemetry.
