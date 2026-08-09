@@ -77,3 +77,23 @@
         (let ((text (observability-kit/prometheus:render-prometheus registry)))
           (expect (null (search "authorization" text)) :to-be-truthy)
           (expect (null (search "secret" text)) :to-be-truthy))))))
+
+(describe "exporter fuzz boundaries"
+  (it-fuzz "renders generated label values without crashing"
+      ((label-value
+         (gen-string
+          :min-length 0
+          :max-length 12
+          :alphabet (concatenate 'string
+                                 "abc_/"
+                                 (string #\\)
+                                 (string #\")
+                                 (string #\Newline)
+                                 (string #\Return)))))
+      (:trials 40 :timeout-per-trial 1)
+    (let* ((registry (make-metric-registry))
+           (metric (define-gauge registry fuzz_value
+                     :label-names '("route"))))
+      (metric-set metric 1 :labels (list "route" label-value))
+      (let ((text (observability-kit/prometheus:render-prometheus registry)))
+        (expect (> (length text) 0) :to-be-truthy)))))

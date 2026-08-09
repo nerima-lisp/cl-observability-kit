@@ -112,6 +112,12 @@ boundary tests; the reported 100% is intentionally not a claim about every
 source form. The test command uses a fail-closed empty-test policy so coverage
 cannot pass with no selected tests.
 
+The test suite uses cl-weave beyond example-based assertions: composed
+generators exercise exact gauge state transitions, while `it-fuzz` feeds
+Prometheus rendering label values containing escaping-sensitive characters.
+Set `CL_WEAVE_PROPERTY_TESTS` and `CL_WEAVE_PROPERTY_SEED` to reproduce a
+property run.
+
 The raw `coverage.sexp` is an implementation artifact of cl-weave and SBCL and
 may contain loaded dependency pathnames. The filtered `coverage-report/`
 output and the explicit source policy above are the acceptance boundary; the

@@ -238,7 +238,11 @@ The test system covers metric aggregation, validation, bounded cardinality,
 deterministic snapshots, Prometheus escaping, concurrent updates, health
 failure isolation and cancellation, readiness/liveness/startup separation,
 instrumentation context, the optional log bridge, OTLP-shaped output, secret
-rejection, and the public-API quick start.
+rejection, and the public-API quick start. It also uses cl-weave's generator
+composition (`gen-list`, `gen-tuple`, and `gen-member`) for metric invariants
+and `it-fuzz` for Prometheus label escaping/no-crash coverage. Property tests
+can be made reproducible with `CL_WEAVE_PROPERTY_TESTS` and
+`CL_WEAVE_PROPERTY_SEED`.
 
 ## License
 

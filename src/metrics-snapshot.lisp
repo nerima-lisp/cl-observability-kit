@@ -29,6 +29,61 @@
                           (%snapshot-series metric series))
                         series)))))
 
+(defun %copy-metric-sample (sample)
+  (if (metric-sample-p sample)
+      (%make-metric-sample
+       (%copy-alist (%metric-sample-labels sample))
+       (%metric-sample-value sample)
+       (%metric-sample-count sample)
+       (%metric-sample-sum sample)
+       (%copy-alist (%metric-sample-buckets sample)))
+      sample))
+
+(defun metric-snapshot-name (snapshot)
+  (check-type snapshot metric-snapshot)
+  (%copy-observability-value (%metric-snapshot-name snapshot)))
+
+(defun metric-snapshot-help (snapshot)
+  (check-type snapshot metric-snapshot)
+  (%copy-observability-value (%metric-snapshot-help snapshot)))
+
+(defun metric-snapshot-type (snapshot)
+  (check-type snapshot metric-snapshot)
+  (%metric-snapshot-type snapshot))
+
+(defun metric-snapshot-unit (snapshot)
+  (check-type snapshot metric-snapshot)
+  (%copy-observability-value (%metric-snapshot-unit snapshot)))
+
+(defun metric-snapshot-label-names (snapshot)
+  (check-type snapshot metric-snapshot)
+  (mapcar #'%copy-observability-value
+          (%metric-snapshot-label-names snapshot)))
+
+(defun metric-snapshot-samples (snapshot)
+  (check-type snapshot metric-snapshot)
+  (mapcar #'%copy-metric-sample (%metric-snapshot-samples snapshot)))
+
+(defun metric-sample-labels (sample)
+  (check-type sample metric-sample)
+  (%copy-alist (%metric-sample-labels sample)))
+
+(defun metric-sample-value (sample)
+  (check-type sample metric-sample)
+  (%metric-sample-value sample))
+
+(defun metric-sample-count (sample)
+  (check-type sample metric-sample)
+  (%metric-sample-count sample))
+
+(defun metric-sample-sum (sample)
+  (check-type sample metric-sample)
+  (%metric-sample-sum sample))
+
+(defun metric-sample-buckets (sample)
+  (check-type sample metric-sample)
+  (%copy-alist (%metric-sample-buckets sample)))
+
 (defun metric-snapshot (object)
   "Return a deterministic snapshot of one METRIC or every registry metric.
 

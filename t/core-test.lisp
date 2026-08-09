@@ -47,6 +47,29 @@
       (expect (metric-inc counter left) :to-equal left)
       (expect (metric-inc counter right) :to-equal (+ left right))))
 
+  (it-property "applies generated gauge updates exactly"
+      ((updates
+         (gen-list
+          (gen-tuple (gen-member '(:increment :set))
+                     (gen-integer :min -100 :max 100))
+          :min-length 1
+          :max-length 12)))
+    (let* ((registry (make-metric-registry))
+           (gauge (define-gauge registry property_gauge))
+           (expected 0))
+      (dolist (update updates)
+        (destructuring-bind (operation value) update
+          (ecase operation
+            (:increment
+             (incf expected value)
+             (expect (metric-inc gauge value) :to-equal expected))
+            (:set
+             (setf expected value)
+             (expect (metric-set gauge value) :to-equal expected)))))
+      (expect (metric-sample-value
+               (sample-of (metric-snapshot gauge)))
+              :to-equal expected)))
+
   (it "normalizes labels and keeps label sets bounded"
     (let* ((registry (make-metric-registry :max-label-value-length 8))
            (metric (define-counter registry http_requests_total
@@ -142,6 +165,43 @@
         (expect (= 1 (metric-sample-value sample)))
         (expect (string= "/health" (cdr (first (metric-sample-labels sample))))))
       (expect (string= "blue" (context-attribute context "deployment")))))
+
+  (it "keeps snapshot accessors detached"
+    (let* ((registry (make-metric-registry))
+           (histogram (define-histogram registry snapshot_boundary
+                         :help "Latency"
+                         :unit "seconds"
+                         :label-names '(route)
+                         :buckets '(1 2))))
+      (metric-observe histogram 1 :labels '(route "/health"))
+      (let* ((snapshot (metric-snapshot histogram))
+             (name (metric-snapshot-name snapshot))
+             (help (metric-snapshot-help snapshot))
+             (unit (metric-snapshot-unit snapshot))
+             (label-names (metric-snapshot-label-names snapshot))
+             (samples (metric-snapshot-samples snapshot))
+             (sample (first samples))
+             (labels (metric-sample-labels sample))
+             (buckets (metric-sample-buckets sample)))
+        (setf (char name 0) #\X
+              (char help 0) #\X
+              (char unit 0) #\X
+              (char (first label-names) 0) #\X
+              (char (car (first labels)) 0) #\X
+              (char (cdr (first labels)) 0) #\X
+              (cdr (first buckets)) 99
+              (cdr samples) nil)
+        (expect (metric-snapshot-name snapshot) :to-equal "snapshot_boundary")
+        (expect (metric-snapshot-help snapshot) :to-equal "Latency")
+        (expect (metric-snapshot-unit snapshot) :to-equal "seconds")
+        (expect (metric-snapshot-label-names snapshot) :to-equal '("route"))
+        (expect (length (metric-snapshot-samples snapshot)) :to-equal 1)
+        (expect (metric-sample-labels
+                 (first (metric-snapshot-samples snapshot)))
+                :to-equal '(("route" . "/health")))
+        (expect (cdr (first (metric-sample-buckets
+                             (first (metric-snapshot-samples snapshot)))))
+                :to-equal 1))))
 
   (it "keeps concurrent counter updates lossless"
     (let* ((registry (make-metric-registry))

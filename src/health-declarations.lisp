@@ -57,5 +57,3 @@ thread implementation."
    #-sbcl (lambda (thread)
             (declare (ignore thread))
             nil)))
-
-(defparameter +health-join-marker+ (gensym "HEALTH-JOIN-MARKER-"))

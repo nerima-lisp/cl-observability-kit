@@ -37,7 +37,8 @@
   (sum 0)
   bucket-counts)
 
-(defstruct metric-snapshot
+(defstruct (metric-snapshot
+            (:conc-name %metric-snapshot-))
   name
   help
   type
@@ -47,7 +48,8 @@
 
 (defstruct (metric-sample
             (:constructor %make-metric-sample
-                (labels value count sum buckets)))
+                (labels value count sum buckets))
+            (:conc-name %metric-sample-))
   labels
   value
   count
