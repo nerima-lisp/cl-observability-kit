@@ -106,6 +106,23 @@ implementation and keeps timeout cleanup on the same path as normal results."
     (setf (%health-registry-last-results registry) (copy-list results)))
   results)
 
+(defun %run-health-check-sequence (checks parent clock continuation)
+  "Run CHECKS in order and pass their results to CONTINUATION."
+  (if (null checks)
+      (funcall continuation nil)
+      (%run-health-check
+       (first checks)
+       parent
+       clock
+       (lambda (result)
+         (%run-health-check-sequence
+          (rest checks)
+          parent
+          clock
+          (lambda (remaining-results)
+            (funcall continuation
+                     (cons result remaining-results))))))))
+
 (defun run-health-checks (registry &key kind kinds cancellation-token)
   "Run selected checks and return isolated HEALTH-RESULT structures.
 
@@ -119,13 +136,9 @@ then terminates a still-running SBCL worker before its result is returned."
          (parent (or cancellation-token (make-cancellation-token)))
          (clock (health-registry-clock registry))
          (checks (%selected-health-checks registry normalized-kinds)))
-    (labels ((proceed (remaining reversed)
-               (if (null remaining)
-                   (%store-health-results registry (nreverse reversed))
-                   (%run-health-check
-                    (first remaining)
-                    parent
-                    clock
-                    (lambda (result)
-                      (proceed (rest remaining) (cons result reversed)))))))
-      (proceed checks nil))))
+    (%run-health-check-sequence
+     checks
+     parent
+     clock
+     (lambda (results)
+       (%store-health-results registry results)))))

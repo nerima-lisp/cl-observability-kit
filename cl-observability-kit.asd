@@ -85,6 +85,7 @@
   :pathname "t"
   :serial t
   :components ((:file "package")
+               (:file "weave-integration-test")
                (:file "edge-fixtures")
                (:file "core-test")
                (:file "prometheus-test")
