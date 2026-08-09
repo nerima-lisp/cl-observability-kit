@@ -24,6 +24,35 @@ readable and removes the old runtime string/designator compatibility surface."
              (push key seen)))
   options)
 
+(defmacro %with-metric-series ((series metric labels) &body body)
+  "Run BODY with the locked metric series for LABELS.
+
+The lookup, cardinality check, creation, and update share one lock so a new
+series cannot race another operation for the same metric."
+  (let ((metric-variable (gensym "METRIC-"))
+        (labels-variable (gensym "LABELS-")))
+    `(let ((,metric-variable ,metric)
+           (,labels-variable ,labels))
+       (cl-concurrent-kit:with-lock-held ((%metric-lock ,metric-variable))
+         (let ((,series
+                 (or (gethash ,labels-variable (%metric-series ,metric-variable))
+                     (when (>= (hash-table-count (%metric-series ,metric-variable))
+                               (%metric-cardinality-limit ,metric-variable))
+                       (error 'metric-cardinality-exceeded
+                              :name (%metric-name ,metric-variable)
+                              :limit (%metric-cardinality-limit ,metric-variable)
+                              :labels ,labels-variable
+                              :message (format nil
+                                               "Metric ~S exceeded its cardinality limit of ~D."
+                                               (%metric-name ,metric-variable)
+                                               (%metric-cardinality-limit ,metric-variable))))
+                     (setf (gethash ,labels-variable
+                                    (%metric-series ,metric-variable))
+                           (%empty-series (%metric-kind ,metric-variable)
+                                          (%metric-histogram-buckets ,metric-variable)
+                                          ,labels-variable)))))
+           ,@body)))))
+
 (defmacro define-counter (registry name &rest options)
   "Define a counter named by the symbol NAME in REGISTRY."
   (%validate-metric-definition-options options)

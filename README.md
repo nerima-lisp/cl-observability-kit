@@ -52,6 +52,7 @@ nix run .#test
 sbcl --script run-tests.lisp
 sbcl --script run-coverage.lisp
 nix flake check
+nix build .#docs
 nix fmt
 ```
 

@@ -10,13 +10,15 @@ nix run .#test
 sbcl --script run-tests.lisp
 sbcl --script run-coverage.lisp
 nix flake check
+nix build .#docs
 nix fmt
 ```
 
 `nix flake show` exposes the test app as `.#test` (`nix run .#test`), the
-repository checks, the formatter, and the package for the supported systems.
-The direct SBCL scripts are useful when diagnosing ASDF or test-runner
-behavior. The test system uses `cl-weave` and rejects an empty test selection.
+repository checks, the formatter, the documentation site as `.#docs`, and the
+package for the supported systems. The direct SBCL scripts are useful when
+diagnosing ASDF or test-runner behavior. The test system uses `cl-weave` and
+rejects an empty or partially non-runnable test selection.
 
 The Nix shell provides the pinned `paredit-cli` executable as `paredit` for
 read-only structural validation and analysis. Keep generated build output and
@@ -65,17 +67,22 @@ The site configuration is `docs/mkdocs.yml`, and its source is under
 mkdocs build --strict -f docs/mkdocs.yml
 ```
 
-The current flake exposes test, formatting, package, and development-shell
-outputs but does not expose a `packages.docs` output. Run the MkDocs command
-directly when validating documentation; `nix flake check` does not currently
-stand in for that site build.
+The flake exposes the rendered site as `.#docs`; its build uses MkDocs Material
+with `--strict` and also asserts that `index.html` was produced. A local
+checkout can run the equivalent command directly when MkDocs Material is
+installed:
+
+```sh
+mkdocs build --strict -f docs/mkdocs.yml
+```
 
 ## Source layout
 
 The core source is split by responsibility: metric model, definition,
-operation, and snapshot files; health model, registry, and execution files;
-context and optional adapter files. Tests live in `t/` and are loaded through
-the `cl-observability-kit/tests` system.
+operation, and snapshot files; health model, registry, thread, and execution
+files; context and optional adapter files. Prometheus source selection,
+formatting, and sample emission are separate files. Tests live in `t/` and are
+loaded through the `cl-observability-kit/test` system.
 
 When public semantics change, update the API and architecture pages together
 with the README entry point. Keep HTTP routes, exporter lifecycle, and

@@ -7,12 +7,14 @@
 (load (merge-pathnames "scripts/bootstrap.lisp" *script-directory*))
 (observability-kit.bootstrap:initialize-source-registry)
 (asdf:load-system "cl-weave")
+(load (merge-pathnames "scripts/test-plan.lisp" *script-directory*))
 
 (let ((success
         (handler-case
             (let ((root (observability-kit.bootstrap:initialize-source-registry)))
               (declare (ignore root))
               (asdf:load-system "cl-observability-kit/test")
+              (observability-kit.test-plan:assert-runnable-test-plan)
               (cl-weave:run-all
                :reporter :spec
                :pass-with-no-tests nil))

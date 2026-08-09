@@ -15,6 +15,7 @@
 (load (merge-pathnames "scripts/bootstrap.lisp" *script-directory*))
 (observability-kit.bootstrap:initialize-source-registry)
 (asdf:load-system "cl-weave")
+(load (merge-pathnames "scripts/test-plan.lisp" *script-directory*))
 
 (let* ((root (observability-kit.bootstrap:initialize-source-registry))
        (report-directory (merge-pathnames "coverage-report/" root))
@@ -54,24 +55,34 @@
                ;; bits.  Reload the implementation systems after the reset
                ;; so optional exporters are part of the same measured run.
                (asdf:load-system "cl-observability-kit/test" :force t)
+               (observability-kit.test-plan:assert-runnable-test-plan)
                (cl-weave:reset-coverage)
                (dolist (system '("cl-observability-kit"
                                   "cl-observability-kit/prometheus"
                                   "cl-observability-kit/otlp"
                                   "cl-observability-kit/log-kit"))
                  (asdf:load-system system :force t))
-               (cl-weave:run-all
-                :reporter :spec
-                :pass-with-no-tests nil
-                :coverage t
-                :coverage-output coverage-output
-                :coverage-report-directory report-directory
-                :coverage-include-pathnames
-                coverage-source-pathnames
-                :coverage-exclude-pathnames coverage-exclude-pathnames
-                :coverage-minimum-expression 100
-                :coverage-minimum-branch 100
-                :coverage-reset nil))
+               (let ((result
+                       (cl-weave:run-all
+                        :reporter :spec
+                        :pass-with-no-tests nil
+                        :coverage t
+                        :coverage-output coverage-output
+                        :coverage-report-directory report-directory
+                        :coverage-include-pathnames
+                        coverage-source-pathnames
+                        :coverage-exclude-pathnames coverage-exclude-pathnames
+                        :coverage-minimum-expression 100
+                        :coverage-minimum-branch 100
+                        :coverage-reset nil)))
+                 (when result
+                   (observability-kit.test-plan:assert-non-empty-file
+                    coverage-output
+                    "Coverage data")
+                   (observability-kit.test-plan:assert-non-empty-file
+                    (merge-pathnames "cover-index.html" report-directory)
+                    "Coverage report"))
+                 result))
            (error (condition)
              (format *error-output* "~&Coverage runner failed (~S): ~A~%"
                      (type-of condition)

@@ -45,6 +45,9 @@
   :pathname "src"
   :serial t
   :components ((:file "package-prometheus")
+               (:file "prometheus-source")
+               (:file "prometheus-format")
+               (:file "prometheus-samples")
                (:file "prometheus")))
 
 (asdf:defsystem "cl-observability-kit/otlp"
@@ -88,7 +91,19 @@
                (:file "edge-test"))
   :perform (asdf:test-op (operation component)
              (declare (ignore operation component))
-             (unless (uiop:symbol-call '#:cl-weave '#:run-all
-                                       :reporter :spec
-                                       :pass-with-no-tests nil)
-               (error "cl-observability-kit tests failed."))))
+             (let* ((suite (uiop:symbol-call '#:cl-weave '#:root-suite))
+                    (plan (uiop:symbol-call '#:cl-weave '#:collect-test-plan suite)))
+               (unless (and plan
+                            (every (lambda (entry)
+                                     (eq :run
+                                         (uiop:symbol-call
+                                          '#:cl-weave
+                                          '#:test-plan-entry-status
+                                          entry)))
+                                   plan))
+                 (error "cl-observability-kit test plan is empty or contains non-runnable tests."))
+               (format t "~&Test plan: ~D runnable tests.~%" (length plan))
+               (unless (uiop:symbol-call '#:cl-weave '#:run-all
+                                         :reporter :spec
+                                         :pass-with-no-tests nil)
+                 (error "cl-observability-kit tests failed.")))))

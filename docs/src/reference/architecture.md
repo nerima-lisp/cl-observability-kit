@@ -48,6 +48,9 @@ The source layout keeps the primary data model separate from operations:
   continuation boundary.
 - `health-status.lisp` computes aggregate status without starting checks.
 - `health-macros.lisp` provides the macro-first health definition API.
+- `prometheus-source.lisp` selects and snapshots exporter input.
+- `prometheus-format.lisp` normalizes numbers and escapes exposition text.
+- `prometheus-samples.lisp` emits labels, samples, and histogram buckets.
 
 Metric definitions are macros because names and options are configuration, not
 runtime input. `define-counter`, `define-gauge`, and `define-histogram` reject
@@ -124,8 +127,9 @@ files. The excluded declaration and macro-expansion files are
 `package-log-kit.lisp`.
 Those files are still covered by compilation/loading, public API tests, and
 boundary tests; the reported 100% is intentionally not a claim about every
-source form. The test command uses a fail-closed empty-test policy so coverage
-cannot pass with no selected tests.
+source form. The test command uses a fail-closed empty or partially
+non-runnable test policy so coverage cannot pass with no selected tests or a
+silently reduced selection.
 
 Each source component selects its package with a reader-time `#.` form, keeping
 package setup outside executable coverage while preserving independent ASDF

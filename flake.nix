@@ -89,6 +89,11 @@
 
       timeoutSeconds = 120;
 
+      docs = {
+        root = ./.;
+        mkdocsYmlName = "docs/mkdocs.yml";
+      };
+
       treefmt.evalModule = treefmt-nix.lib.evalModule;
 
       devShellPackages = ctx: [
