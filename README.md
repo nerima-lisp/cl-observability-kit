@@ -176,8 +176,9 @@ the remaining checks. See [the architecture notes](docs/architecture.md) for
 the ownership boundaries and extension points.
 
 The repository pins the current nerima-lisp dependency floors in the ASDF
-systems and provides a Nix development shell with `paredit-cli`. The optional
-systems remain independently loadable; loading the core does not load
+systems and provides a Nix development shell with the pinned `paredit-cli`
+tool (the executable is `paredit`). The optional systems remain independently
+loadable; loading the core does not load
 `cl-log-kit`, an HTTP client/server, or an exporter transport.
 
 ## Testing
@@ -199,7 +200,8 @@ nix flake check
 `run-coverage.lisp` asks cl-weave for expression and branch coverage with a
 100% minimum. Coverage artifacts are written under `coverage-report/` and
 `coverage.sexp`, both ignored by Git. The Nix shell also exposes the pinned
-`paredit-cli` used to validate and format the Lisp sources.
+`paredit-cli` as `paredit` for read-only structural validation and analysis;
+`nix fmt` runs the configured formatter.
 
 The test system covers metric aggregation, validation, bounded cardinality,
 deterministic snapshots, Prometheus escaping, concurrent updates, health
