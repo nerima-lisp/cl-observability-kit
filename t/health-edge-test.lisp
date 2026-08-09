@@ -9,6 +9,8 @@
         (make-health-registry :default-timeout 0))
       (signals observability-error
         (make-health-registry :cancellation-grace-period 0))
+      (signals observability-error
+        (make-health-registry :monotonic-units-per-second 0))
       (signals health-error
         (register-health-check registry "authorization" #'edge-health-pass))
       (signals health-error
@@ -198,6 +200,7 @@
                           check
                           (make-cancellation-token)
                           (health-registry-clock registry)
+                          (health-registry-monotonic-units-per-second registry)
                           (lambda (value)
                             (setf result value))))
                        result)))
@@ -206,9 +209,28 @@
                 (expect (typep (health-result-condition timeout-result)
                                'health-check-timeout)
                         :to-be-truthy)
-                (expect (typep (health-result-condition cancelled-result)
+        (expect (typep (health-result-condition cancelled-result)
                                'health-check-cancelled)
                         :to-be-truthy)))))))))
+
+  (it "bounds finite timeouts when an injected clock stops advancing"
+    (let* ((clock (cl-boundary-kit:make-fake-clock
+                   :start 0
+                   :monotonic-start 0))
+           (registry (make-health-registry
+                      :clock clock
+                      :monotonic-units-per-second 1
+                      :default-timeout nil
+                      :cancellation-grace-period 0.01d0)))
+      (register-health-check registry "frozen-clock"
+                              #'edge-health-await-cancellation
+                              :timeout 0.005d0)
+      (let ((result (first (run-health-checks registry))))
+        (expect (health-result-status result) :to-equal :timeout)
+        (expect (health-result-duration result) :to-equal 0)
+        (expect (typep (health-result-condition result)
+                       'health-check-timeout)
+                :to-be-truthy))))
 
 (describe "health execution composition"
   (it-each ((:pass :healthy)
@@ -230,7 +252,9 @@
            (token (make-cancellation-token)))
       (with-continuation-result (result next calledp)
           (observability-kit::%run-health-check
-           check token (health-registry-clock registry) #'next)
+           check token (health-registry-clock registry)
+           (health-registry-monotonic-units-per-second registry)
+           #'next)
         (expect calledp :to-be-truthy)
         (expect (health-result-name result) :to-equal "cps")
         (expect (health-result-status result) :to-equal :pass)))))

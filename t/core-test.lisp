@@ -288,15 +288,20 @@
     (let* ((clock (cl-boundary-kit:make-fake-clock
                    :start 100
                    :monotonic-start 200))
-           (registry (make-health-registry :clock clock)))
+           (registry (make-health-registry
+                      :clock clock
+                      :monotonic-units-per-second 1)))
       (expect (eq (health-registry-clock registry) clock) :to-be-truthy)
+      (expect (health-registry-monotonic-units-per-second registry)
+              :to-equal 1)
       (define-health-check registry macro_defined (:kind :liveness) (token)
         (declare (ignore token))
+        (cl-boundary-kit:advance-fake-clock clock 2 :monotonic-delta 2)
         :ok)
       (let ((result (first (run-health-checks registry :kind :liveness))))
         (expect (health-result-status result) :to-equal :pass)
         (expect (health-result-value result) :to-equal :ok)
-        (expect (health-result-duration result) :to-equal 0)))
+        (expect (health-result-duration result) :to-equal 2)))
     (signals observability-error
       (make-health-registry :clock :not-a-clock)))
 

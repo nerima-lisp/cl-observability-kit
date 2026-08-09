@@ -114,19 +114,27 @@ alive."
 
 DEFAULT-TIMEOUT may be NIL to disable the per-check deadline.  A positive
   CANCELLATION-GRACE-PERIOD is used before the SBCL worker is forcefully
-terminated if it ignores cancellation.  CLOCK supplies wall and monotonic
-time through cl-boundary-kit's public clock protocol."
+  terminated if it ignores cancellation.  CLOCK supplies wall and monotonic
+  time through cl-boundary-kit's public clock protocol.  MONOTONIC-UNITS-PER-SECOND
+  names the number of monotonic clock units in one second; it defaults to
+  INTERNAL-TIME-UNITS-PER-SECOND for the standard clock."
   (let* ((options (%parse-keyword-options
                    option-list
-                   '(:default-timeout :cancellation-grace-period :clock)
+                   '(:default-timeout :cancellation-grace-period :clock
+                     :monotonic-units-per-second)
                    "MAKE-HEALTH-REGISTRY"))
          (default-timeout (%option-value options :default-timeout 5.0d0))
          (cancellation-grace-period
            (%option-value options :cancellation-grace-period 0.1d0))
-         (clock (%option-value options :clock (cl-boundary-kit:make-clock))))
+         (clock (%option-value options :clock (cl-boundary-kit:make-clock)))
+         (monotonic-units-per-second
+           (%option-value options :monotonic-units-per-second
+                          internal-time-units-per-second)))
     (%validate-health-duration default-timeout "Default health timeout" :allow-nil t)
     (%validate-health-duration cancellation-grace-period
                                "Health cancellation grace period")
+    (%validate-health-duration monotonic-units-per-second
+                               "Health monotonic clock units per second")
     (%validate-health-clock clock)
     (%make-health-registry
      (cl-concurrent-kit:make-lock :name "observability-health")
@@ -134,9 +142,15 @@ time through cl-boundary-kit's public clock protocol."
      default-timeout
      cancellation-grace-period
      clock
+     monotonic-units-per-second
      nil)))
 
 (defun health-registry-clock (registry)
   "Return the clock used for health deadlines and result durations."
   (check-type registry health-registry)
   (%health-registry-clock registry))
+
+(defun health-registry-monotonic-units-per-second (registry)
+  "Return the monotonic clock units that make up one second."
+  (check-type registry health-registry)
+  (%health-registry-monotonic-units-per-second registry))

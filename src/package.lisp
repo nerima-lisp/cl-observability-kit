@@ -64,6 +64,7 @@
    #:health-registry-p
    #:make-health-registry
    #:health-registry-clock
+   #:health-registry-monotonic-units-per-second
    #:health-check
    #:health-check-p
    #:health-check-name

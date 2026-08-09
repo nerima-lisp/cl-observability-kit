@@ -26,6 +26,9 @@ input because it is followed by the nerima-lisp dependency graph, but it is
 not a direct source dependency here. Optional systems add only the integration
 they need.
 
+Health registries also declare the monotonic clock's units-per-second scale, so
+custom clocks do not inherit an implicit SBCL timing unit.
+
 ## Data and logic
 
 The source layout keeps the primary data model separate from operations:
@@ -88,9 +91,12 @@ continuation based: each completed check invokes the continuation for the next
 check, so a condition in one check is represented in that result and cannot
 terminate the registry-wide run.
 
-Timeouts use the registry's injected `cl-boundary-kit` clock for monotonic
-deadlines and durations. They first request cooperative cancellation, then
-wait for a bounded grace period. On the supported SBCL runtime, a worker that
+Timeouts use the registry's injected `cl-boundary-kit` clock and declared
+monotonic units-per-second scale for deadlines and durations. A finite timeout
+also has an independent real-time safety deadline, so a custom or fake clock
+that stops advancing cannot keep a worker wait alive indefinitely. They first
+request cooperative cancellation, then wait for a bounded grace period. On the
+supported SBCL runtime, a worker that
 ignores the token is terminated and the implementation verifies that it
 stopped. If the runtime cannot provide that guarantee, the result is an
 explicit health error; the package never reports a timed-out check as healthy.

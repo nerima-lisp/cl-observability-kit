@@ -35,7 +35,7 @@ cannot be negative, and all metric values must be finite real numbers.
 
 | Operation | Purpose |
 | --- | --- |
-| `make-health-registry &rest option-list` | Create a registry. `:default-timeout` defaults to `5.0d0`; `:cancellation-grace-period` defaults to `0.1d0`. |
+| `make-health-registry &rest option-list` | Create a registry. `:default-timeout` defaults to `5.0d0`; `:cancellation-grace-period` defaults to `0.1d0`; `:clock` and `:monotonic-units-per-second` configure time injection. |
 | `define-health-check registry name (options) lambda-list &body body` | Define and register a check with a symbol name and options `:kind`, `:timeout`, `:cancellation-grace-period`, and `:replace`, checked at macroexpansion time. This is a macro. |
 | `register-health-check registry name function &rest option-list` | Register a function accepting one cancellation token. Options are `:kind`, `:timeout`, `:cancellation-grace-period`, and `:replace`. Use this when the name or function is only known at runtime. |
 | `unregister-health-check registry name &rest option-list` | Remove a check, using `:kind` to select the check kind. |
@@ -46,6 +46,10 @@ The check function returns true for pass, `nil` for a normal failure, or may
 signal a condition. Supported kinds are `:liveness`, `:readiness`, and
 `:startup`. `health-registry-checks` and `health-registry-last-results` expose
 detached registry views.
+
+When `:clock` is custom or fake, its monotonic values must use the unit scale
+declared by `:monotonic-units-per-second`. `health-registry-clock` and
+`health-registry-monotonic-units-per-second` expose the configured boundaries.
 
 Cancellation is explicit through `make-cancellation-token`,
 `cancel-cancellation-token`, `cancellation-requested-p`, and

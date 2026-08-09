@@ -5,21 +5,31 @@
 (defun %health-monotonic-time (clock)
   (cl-boundary-kit:clock-monotonic clock))
 
-(defun %health-deadline (clock timeout)
+(defun %health-deadline (clock timeout monotonic-units-per-second)
   (and timeout
        (+ (%health-monotonic-time clock)
+          (ceiling (* timeout monotonic-units-per-second)))))
+
+(defun %health-real-time-deadline (timeout)
+  (and timeout
+       (+ (get-internal-real-time)
           (ceiling (* timeout internal-time-units-per-second)))))
 
-(defun %wait-for-health-thread (thread token clock timeout)
-  (let ((deadline (%health-deadline clock timeout)))
+(defun %wait-for-health-thread
+    (thread token clock timeout monotonic-units-per-second)
+  (let ((deadline (%health-deadline clock timeout monotonic-units-per-second))
+        (real-time-deadline (%health-real-time-deadline timeout)))
     (loop
       (when (cancellation-requested-p token)
         (return-from %wait-for-health-thread
           (values :cancelled nil nil)))
       (let* ((now (%health-monotonic-time clock))
+             (real-time-now (get-internal-real-time))
              (remaining (and deadline
-                             (/ (- deadline now)
-                                internal-time-units-per-second))))
+                             (min (/ (- deadline now)
+                                     monotonic-units-per-second)
+                                  (/ (- real-time-deadline real-time-now)
+                                     internal-time-units-per-second)))))
         (when (and remaining (not (plusp remaining)))
           (return-from %wait-for-health-thread
             (values :timeout nil nil)))
@@ -29,13 +39,13 @@
           (multiple-value-bind (status value condition)
               (cl-concurrent-kit:join-thread
                thread :default nil :timeout wait)
-            (unless (null status)
+            (when status
               (return-from %wait-for-health-thread
                 (values status value condition)))))))))
 
-(defun %health-duration-since (clock started)
+(defun %health-duration-since (clock started monotonic-units-per-second)
   (/ (- (%health-monotonic-time clock) started)
-     internal-time-units-per-second))
+     monotonic-units-per-second))
 
 (defun %start-health-thread (worker name)
   (cl-concurrent-kit:make-thread worker :name name))

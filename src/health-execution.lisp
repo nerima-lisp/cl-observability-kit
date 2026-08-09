@@ -44,15 +44,16 @@
                      :check-name (health-check-name check)
                      :kind (health-check-kind check)))))
 
-(defun %health-result-for-status (check status clock started
-                                  &key value condition)
+(defun %health-result-for-status
+    (check status clock started monotonic-units-per-second
+     &key value condition)
   (make-health-result
    :name (health-check-name check)
    :kind (health-check-kind check)
    :status status
    :value value
    :condition condition
-   :duration (%health-duration-since clock started)))
+   :duration (%health-duration-since clock started monotonic-units-per-second)))
 
 (defun %health-thread-name (check)
   (format nil "health-~A-~A"
@@ -60,24 +61,29 @@
           (health-check-name check)))
 
 (defun %health-result-after-thread
-    (check thread child-token status value condition clock started)
+    (check thread child-token status value condition clock started
+     monotonic-units-per-second)
   (case status
     ((:pass :fail)
      (%health-result-for-status check status clock started
+                                monotonic-units-per-second
                                 :value value
                                 :condition condition))
     ((:timeout :cancelled)
      (%health-result-for-status
       check status clock started
+      monotonic-units-per-second
       :condition (or (%stop-health-thread thread child-token check status)
                      (%health-cancellation-condition check status))))))
 
-(defun %cancelled-health-result (check clock started)
+(defun %cancelled-health-result
+    (check clock started monotonic-units-per-second)
   (%health-result-for-status
-   check :cancelled clock started
+   check :cancelled clock started monotonic-units-per-second
    :condition (%health-cancellation-condition check :cancelled)))
 
-(defun %run-health-check (check parent-token clock continuation)
+(defun %run-health-check
+    (check parent-token clock monotonic-units-per-second continuation)
   "Run CHECK and pass one isolated result to CONTINUATION.
 
 The continuation is the only exit from the worker boundary. Keeping it
@@ -87,7 +93,8 @@ implementation and keeps timeout cleanup on the same path as normal results."
          (child-token (make-cancellation-token :parent parent-token)))
     (if (cancellation-requested-p parent-token)
         (funcall continuation
-                 (%cancelled-health-result check clock started))
+                 (%cancelled-health-result
+                  check clock started monotonic-units-per-second))
         (let ((thread
                 (%start-health-thread
                  (lambda ()
@@ -95,18 +102,20 @@ implementation and keeps timeout cleanup on the same path as normal results."
                  (%health-thread-name check))))
           (multiple-value-bind (status value condition)
               (%wait-for-health-thread
-               thread child-token clock (health-check-timeout check))
+               thread child-token clock (health-check-timeout check)
+               monotonic-units-per-second)
             (funcall continuation
                      (%health-result-after-thread
                       check thread child-token status value condition
-                      clock started)))))))
+                      clock started monotonic-units-per-second)))))))
 
 (defun %store-health-results (registry results)
   (cl-concurrent-kit:with-lock-held ((%health-registry-lock registry))
     (setf (%health-registry-last-results registry) (copy-list results)))
   results)
 
-(defun %run-health-check-sequence (checks parent clock continuation)
+(defun %run-health-check-sequence
+    (checks parent clock monotonic-units-per-second continuation)
   "Run CHECKS in order and pass their results to CONTINUATION."
   (if (null checks)
       (funcall continuation nil)
@@ -114,11 +123,13 @@ implementation and keeps timeout cleanup on the same path as normal results."
        (first checks)
        parent
        clock
+       monotonic-units-per-second
        (lambda (result)
          (%run-health-check-sequence
           (rest checks)
           parent
           clock
+          monotonic-units-per-second
           (lambda (remaining-results)
             (funcall continuation
                      (cons result remaining-results))))))))
@@ -135,10 +146,13 @@ then terminates a still-running SBCL worker before its result is returned."
   (let* ((normalized-kinds (%normalize-health-kinds kind kinds))
          (parent (or cancellation-token (make-cancellation-token)))
          (clock (health-registry-clock registry))
+         (monotonic-units-per-second
+           (health-registry-monotonic-units-per-second registry))
          (checks (%selected-health-checks registry normalized-kinds)))
     (%run-health-check-sequence
      checks
      parent
      clock
+     monotonic-units-per-second
      (lambda (results)
        (%store-health-results registry results)))))

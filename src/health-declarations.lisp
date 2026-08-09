@@ -14,13 +14,14 @@
 (defstruct (health-registry
             (:constructor %make-health-registry
                 (lock checks default-timeout cancellation-grace-period clock
-                 last-results))
+                 monotonic-units-per-second last-results))
             (:conc-name %health-registry-))
   lock
   checks
   default-timeout
   cancellation-grace-period
   clock
+  monotonic-units-per-second
   last-results)
 
 (defstruct (health-check
