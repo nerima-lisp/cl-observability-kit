@@ -1,3 +1,7 @@
+#.(progn
+    (in-package #:observability-kit)
+    nil)
+
 (defun health-registry-checks (registry)
   "Return REGISTRY's checks in deterministic kind/name order."
   (check-type registry health-registry)

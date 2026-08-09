@@ -79,7 +79,6 @@
 
       lispDependencies = ctx: [
         cl-concurrent-kit.packages.${ctx.system}.cl-concurrent-kit
-        cl-date-kit.packages.${ctx.system}.cl-date-kit
         cl-boundary-kit.packages.${ctx.system}.cl-boundary-kit
       ];
 

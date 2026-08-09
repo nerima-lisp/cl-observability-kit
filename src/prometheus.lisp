@@ -1,3 +1,7 @@
+#.(progn
+    (in-package #:observability-kit/prometheus)
+    nil)
+
 (defun %export-error (format-control &rest arguments)
   (error 'observability-error
          :message (apply #'format nil format-control arguments)))
@@ -9,7 +13,7 @@
             ((metric-p source) (list (metric-snapshot source)))
             ((metric-registry-p source) (metric-snapshot source))
             ((null source) nil)
-            ((observability-kit::%proper-list-p source)
+            ((proper-list-p source)
              (unless (every #'metric-snapshot-p source)
                (%export-error
                 "Prometheus source lists must contain metric snapshots."))

@@ -1,3 +1,7 @@
+#.(progn
+    (in-package #:observability-kit/otlp)
+    nil)
+
 (defun %otlp-error (format-control &rest arguments)
   (error 'observability-error
          :message (apply #'format nil format-control arguments)))
@@ -8,7 +12,7 @@
     ((metric-p source) (list (metric-snapshot source)))
     ((metric-registry-p source) (metric-snapshot source))
     ((null source) nil)
-    ((observability-kit::%proper-list-p source)
+    ((proper-list-p source)
      (unless (every #'metric-snapshot-p source)
        (%otlp-error "OTLP source lists must contain metric snapshots."))
      (sort (copy-list source) #'string< :key #'metric-snapshot-name))

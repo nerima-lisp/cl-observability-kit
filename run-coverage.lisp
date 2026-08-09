@@ -13,6 +13,8 @@
    (or *load-truename* *default-pathname-defaults*)))
 
 (load (merge-pathnames "scripts/bootstrap.lisp" *script-directory*))
+(observability-kit.bootstrap:initialize-source-registry)
+(asdf:load-system "cl-weave")
 
 (let* ((root (observability-kit.bootstrap:initialize-source-registry))
        (report-directory (merge-pathnames "coverage-report/" root))
@@ -24,9 +26,15 @@
            "metrics-declarations.lisp"
            "metrics-macros.lisp"
            "health-declarations.lisp"
+           "health-macros.lisp"
            "context-declarations.lisp"
            "context-macros.lisp"
-           "log-kit-macros.lisp"))
+           "log-kit-macros.lisp"
+           "package-prometheus.lisp"
+           "package-otlp.lisp"
+           "package-log-kit.lisp"))
+       (coverage-source-pathnames
+         (observability-kit.bootstrap:source-files root))
        (coverage-exclude-pathnames
          (mapcar (lambda (file)
                    (merge-pathnames file (merge-pathnames "src/" root)))
@@ -35,25 +43,31 @@
          (handler-case
              (progn
                (ensure-directories-exist report-directory)
+               (unless coverage-source-pathnames
+                 (error "Coverage source selection is empty."))
+               (unless (every #'probe-file coverage-exclude-pathnames)
+                 (error "Coverage exclusion list contains a missing source file."))
+               (format t "~&Coverage source policy: ~D source files, ~D excluded.~%"
+                       (length coverage-source-pathnames)
+                       (length coverage-exclude-pathnames))
                ;; SB-COVER clears the source table as well as the execution
                ;; bits.  Reload the implementation systems after the reset
                ;; so optional exporters are part of the same measured run.
                (asdf:load-system "cl-observability-kit/test" :force t)
-               (uiop:symbol-call '#:cl-weave '#:reset-coverage)
+               (cl-weave:reset-coverage)
                (dolist (system '("cl-observability-kit"
                                   "cl-observability-kit/prometheus"
                                   "cl-observability-kit/otlp"
                                   "cl-observability-kit/log-kit"))
                  (asdf:load-system system :force t))
-               (uiop:symbol-call
-                '#:cl-weave '#:run-all
+               (cl-weave:run-all
                 :reporter :spec
                 :pass-with-no-tests nil
                 :coverage t
                 :coverage-output coverage-output
                 :coverage-report-directory report-directory
                 :coverage-include-pathnames
-                (observability-kit.bootstrap:source-files root)
+                coverage-source-pathnames
                 :coverage-exclude-pathnames coverage-exclude-pathnames
                 :coverage-minimum-expression 100
                 :coverage-minimum-branch 100

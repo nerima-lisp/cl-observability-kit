@@ -1,3 +1,7 @@
+#.(progn
+    (in-package #:observability-kit)
+    nil)
+
 (defun %normalize-help (name help)
   (if help
       (progn
@@ -16,7 +20,7 @@
 
 (defun %normalize-buckets (buckets)
   (let ((source (or buckets *default-histogram-buckets*)))
-    (unless (%proper-list-p source)
+    (unless (proper-list-p source)
       (error 'observability-error
              :message "Histogram buckets must be a proper list."))
     (let ((normalized (mapcar (lambda (bucket)

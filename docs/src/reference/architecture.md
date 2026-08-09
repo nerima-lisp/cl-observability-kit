@@ -19,11 +19,12 @@ lifecycle, and provider-specific attributes. This keeps the core useful for a
 library as well as for a service and prevents an integration package from
 silently becoming an application framework.
 
-The Nix closure spells out the pinned `cl-concurrent-kit` transitive
-dependencies used by the nerima-lisp build graph. That makes the development
-environment reproducible without making `cl-date-kit` or `cl-boundary-kit`
-runtime dependencies of the core ASDF system. Optional systems add only the
-integration they need.
+The core ASDF system depends directly on `cl-concurrent-kit` and
+`cl-boundary-kit`: the former supplies synchronization and the latter supplies
+the injectable wall/monotonic clock protocol. `cl-date-kit` remains a flake
+input because it is followed by the nerima-lisp dependency graph, but it is
+not a direct source dependency here. Optional systems add only the integration
+they need.
 
 ## Data and logic
 
@@ -34,10 +35,19 @@ The source layout keeps the primary data model separate from operations:
 - `metrics-definition.lisp` contains the macro-first metric definition API.
 - `metrics-operation.lisp` contains updates and exact numeric validation.
 - `metrics-snapshot.lisp` detaches and sorts exporter input.
-- `health-model.lisp` contains check, result, registry, and cancellation data.
+- `validation.lisp`, `validation-values.lisp`, and `validation-numbers.lisp`
+  keep list, string, and numeric validation policies separate.
+- `health-declarations.lisp` contains check, result, registry, cancellation,
+  and thread-controller data structures.
+- `health-model.lisp` creates cancellation tokens and registries and validates
+  their clock and timeout configuration.
 - `health-registry.lisp` contains registration and lookup operations.
-- `health-execution.lisp` runs checks, isolates conditions, and applies
-  timeout/cancellation policy.
+- `health-thread.lisp` owns monotonic deadlines, bounded joins, and thread
+  lifecycle boundaries.
+- `health-execution.lisp` runs checks and isolates conditions through the
+  continuation boundary.
+- `health-status.lisp` computes aggregate status without starting checks.
+- `health-macros.lisp` provides the macro-first health definition API.
 
 Metric definitions are macros because names and options are configuration, not
 runtime input. `define-counter`, `define-gauge`, and `define-histogram` reject
@@ -69,17 +79,20 @@ context propagation is desired.
 ## Health execution
 
 Health checks are filtered by kind (`:liveness`, `:readiness`, or `:startup`)
-and return independent result objects. The execution path is continuation
-based: each completed check invokes the continuation for the next check, so a
-condition in one check is represented in that result and cannot terminate the
-registry-wide run.
+and return independent result objects. `define-health-check` validates the
+source-level name and options at macroexpansion time. The execution path is
+continuation based: each completed check invokes the continuation for the next
+check, so a condition in one check is represented in that result and cannot
+terminate the registry-wide run.
 
-Timeouts first request cooperative cancellation, then wait for a bounded
-grace period. On the supported SBCL runtime, a worker that ignores the token
-is terminated and the implementation verifies that it stopped. If the
-runtime cannot provide that guarantee, the result is an explicit health error;
-the package never reports a timed-out check as healthy. Check functions should
-poll their token and bound their own external operations.
+Timeouts use the registry's injected `cl-boundary-kit` clock for monotonic
+deadlines and durations. They first request cooperative cancellation, then
+wait for a bounded grace period. On the supported SBCL runtime, a worker that
+ignores the token is terminated and the implementation verifies that it
+stopped. If the runtime cannot provide that guarantee, the result is an
+explicit health error; the package never reports a timed-out check as healthy.
+Check functions should poll their token and bound their own external
+operations.
 
 `health-status` reads the last completed run only. It does not run checks as a
 side effect, and separate health kinds are never implicitly merged. The
@@ -106,11 +119,18 @@ and requires 100% expression and branch coverage for the executable runtime
 files. The excluded declaration and macro-expansion files are
 `package.lisp`, `conditions.lisp`, `validation-data.lisp`,
 `metrics-declarations.lisp`, `metrics-macros.lisp`, `health-declarations.lisp`,
-`context-declarations.lisp`, `context-macros.lisp`, and `log-kit-macros.lisp`.
+`health-macros.lisp`, `context-declarations.lisp`, `context-macros.lisp`,
+`log-kit-macros.lisp`, `package-prometheus.lisp`, `package-otlp.lisp`, and
+`package-log-kit.lisp`.
 Those files are still covered by compilation/loading, public API tests, and
 boundary tests; the reported 100% is intentionally not a claim about every
 source form. The test command uses a fail-closed empty-test policy so coverage
 cannot pass with no selected tests.
+
+Each source component selects its package with a reader-time `#.` form, keeping
+package setup outside executable coverage while preserving independent ASDF
+loading. Package definition files remain explicit components in the system
+definition.
 
 The test suite uses cl-weave beyond example-based assertions: composed
 generators exercise exact gauge state transitions, while `it-fuzz` feeds

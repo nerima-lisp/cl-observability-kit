@@ -37,9 +37,13 @@ src/validation-data.lisp
 src/metrics-declarations.lisp
 src/metrics-macros.lisp
 src/health-declarations.lisp
+src/health-macros.lisp
 src/context-declarations.lisp
 src/context-macros.lisp
 src/log-kit-macros.lisp
+src/package-prometheus.lisp
+src/package-otlp.lisp
+src/package-log-kit.lisp
 ```
 
 The excluded files are still exercised through compilation/loading and public

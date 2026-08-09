@@ -74,19 +74,23 @@ the application's response:
 ```lisp
 (defparameter *health* (observability-kit:make-health-registry))
 
-(observability-kit:register-health-check
- *health* "database"
- (lambda (cancellation-token)
+(observability-kit:define-health-check
+ *health* database (:kind :readiness) (cancellation-token)
    ;; Poll the token around bounded dependency operations in real code.
    (if (observability-kit:cancellation-requested-p cancellation-token)
        nil
        t))
- :kind :readiness)
 
 (observability-kit:run-health-checks *health* :kind :readiness)
 (observability-kit:health-status *health* :kind :readiness)
 ;; => :HEALTHY after the successful run
 ```
+
+`define-health-check` is a macro: NAME is a source-level symbol and its
+options are checked at macroexpansion time, mirroring `define-counter`,
+`define-gauge`, and `define-histogram`. Use the underlying
+`register-health-check` function directly when the name or check function is
+only known at runtime.
 
 The supported kinds are `:liveness`, `:readiness`, and `:startup`. Each check
 receives a child cancellation token and produces an independent result. A

@@ -1,3 +1,7 @@
+#.(progn
+    (in-package #:observability-kit)
+    nil)
+
 (defparameter *sensitive-name-fragments*
   '("authorization" "access-token" "refresh-token" "token" "secret"
     "password" "passwd" "cookie" "api-key" "apikey" "credential"

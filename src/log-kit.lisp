@@ -1,3 +1,7 @@
+#.(progn
+    (in-package #:observability-kit/log-kit)
+    nil)
+
 (defun instrumentation-context-log-fields (context)
   "Return a fresh plist suitable for LOG-KIT's WITH-LOG-CONTEXT.
 

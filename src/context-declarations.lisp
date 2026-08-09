@@ -1,3 +1,7 @@
+#.(progn
+    (in-package #:observability-kit)
+    nil)
+
 (defstruct (instrumentation-context
             (:constructor %make-instrumentation-context
                 (trace-id span-id trace-flags attributes baggage))

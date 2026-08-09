@@ -36,7 +36,8 @@ cannot be negative, and all metric values must be finite real numbers.
 | Operation | Purpose |
 | --- | --- |
 | `make-health-registry &rest option-list` | Create a registry. `:default-timeout` defaults to `5.0d0`; `:cancellation-grace-period` defaults to `0.1d0`. |
-| `register-health-check registry name function &rest option-list` | Register a function accepting one cancellation token. Options are `:kind`, `:timeout`, `:cancellation-grace-period`, and `:replace`. |
+| `define-health-check registry name (options) lambda-list &body body` | Define and register a check with a symbol name and options `:kind`, `:timeout`, `:cancellation-grace-period`, and `:replace`, checked at macroexpansion time. This is a macro. |
+| `register-health-check registry name function &rest option-list` | Register a function accepting one cancellation token. Options are `:kind`, `:timeout`, `:cancellation-grace-period`, and `:replace`. Use this when the name or function is only known at runtime. |
 | `unregister-health-check registry name &rest option-list` | Remove a check, using `:kind` to select the check kind. |
 | `run-health-checks registry &key kind kinds cancellation-token` | Run selected checks and return independent `health-result` objects. |
 | `health-status object &key kind` | Read `:healthy`, `:unhealthy`, or `:unknown` from a result, result list, or the last completed registry run. |
