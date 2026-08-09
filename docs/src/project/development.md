@@ -68,9 +68,14 @@ mkdocs build --strict -f docs/mkdocs.yml
 ```
 
 The flake exposes the rendered site as `.#docs`; its build uses MkDocs Material
-with `--strict` and also asserts that `index.html` was produced. A local
-checkout can run the equivalent command directly when MkDocs Material is
-installed:
+with `--strict` and also asserts that `index.html` was produced. Verify the
+flake artifact itself when reviewing a docs change:
+
+```sh
+nix build .#docs
+test -L result
+find -L result -type f -size +0c -print | rg -m 1 .
+```
 
 ## Source layout
 
