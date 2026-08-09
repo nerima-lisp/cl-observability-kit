@@ -1,3 +1,7 @@
+#.(progn
+    (in-package #:observability-kit)
+    nil)
+
 (defun %operation-labels (arguments)
   (let ((labels nil)
         (labels-supplied-p nil)

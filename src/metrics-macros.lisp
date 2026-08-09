@@ -1,3 +1,7 @@
+#.(progn
+    (in-package #:observability-kit)
+    nil)
+
 (defun %static-metric-name (name)
   "Return the source-level metric name required by DEFINE-* macros.
 

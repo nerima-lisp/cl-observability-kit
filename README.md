@@ -7,8 +7,9 @@ leaving routes, exporters, logging, and span lifecycle to the application or
 the appropriate integration package.
 
 The core system has no HTTP client/server, network exporter, or dependency on
-`cl-log-kit`. It currently follows `cl-concurrent-kit`, which is SBCL-only in
-the current nerima-lisp stack.
+`cl-log-kit`. It uses `cl-concurrent-kit` for synchronization and the public
+clock protocol from `cl-boundary-kit`; the current `cl-concurrent-kit`
+integration is SBCL-only in the nerima-lisp stack.
 
 ## Systems
 
@@ -61,13 +62,11 @@ returned status to the application's response:
 ```lisp
 (defparameter *health* (observability-kit:make-health-registry))
 
-(observability-kit:register-health-check
- *health* "database"
- (lambda (cancellation-token)
+(observability-kit:define-health-check
+ *health* database (:kind :readiness) (cancellation-token)
    (declare (ignore cancellation-token))
    ;; Replace this with a bounded, cancellation-aware dependency probe.
    t)
- :kind :readiness)
 
 (observability-kit:run-health-checks *health* :kind :readiness)
 (observability-kit:health-status *health* :kind :readiness)
@@ -124,15 +123,17 @@ regular histogram label.
 ## Health, readiness, liveness, and startup
 
 Health checks are registered with one of `:liveness`, `:readiness`, or
-`:startup`. A check function receives one cancellation token and returns a
-true value for pass, `nil` for a normal failure, or may signal a condition.
+`:startup`. `define-health-check` validates the source-level name and options
+during macroexpansion. A check function receives one cancellation token and
+returns a true value for pass, `nil` for a normal failure, or may signal a
+condition.
 Each check produces an isolated `health-result`; one failing or signalling
 check does not abort the registry run. `health-status` reports the last
 completed run and never starts checks implicitly. Before a selected kind has
 run, its status is `:unknown`.
 
-Timeouts request cooperative cancellation first and wait for the configured
-grace period. On the supported SBCL runtime, a still-running worker is
+Timeouts use an injectable monotonic clock, request cooperative cancellation
+first, and wait for the configured grace period. On the supported SBCL runtime, a still-running worker is
 forcefully terminated and the implementation checks that it stopped; if the
 runtime cannot stop it, the result carries a `health-error` instead of hiding
 the failure. Checks should still poll `cancellation-requested-p` and bound
@@ -173,7 +174,7 @@ The core deliberately separates metric/health data from operations and keeps
 transport concerns outside the package. Health execution uses a continuation
 chain internally so one check, timeout, or cancellation result cannot abort
 the remaining checks. See [the architecture notes](docs/architecture.md) for
-the ownership boundaries and extension points.
+the ownership boundaries, clock protocol, and extension points.
 
 The repository pins the current nerima-lisp dependency floors in the ASDF
 systems and provides a Nix development shell with the pinned `paredit-cli`
@@ -225,14 +226,23 @@ src/validation-data.lisp
 src/metrics-declarations.lisp
 src/metrics-macros.lisp
 src/health-declarations.lisp
+src/health-macros.lisp
 src/context-declarations.lisp
 src/context-macros.lisp
 src/log-kit-macros.lisp
+src/package-prometheus.lisp
+src/package-otlp.lisp
+src/package-log-kit.lisp
 ```
 
 This is a documented coverage boundary, not a claim that every source form is
 runtime-instrumented. The test runner also rejects an empty test selection, so
 a vacuous green coverage run is not accepted.
+
+Source files select their package with a reader-time `#.` form. This keeps
+package setup out of executable coverage while allowing every ASDF component
+to be loaded independently; package definitions themselves remain explicit
+ASDF components.
 
 The test system covers metric aggregation, validation, bounded cardinality,
 deterministic snapshots, Prometheus escaping, concurrent updates, health

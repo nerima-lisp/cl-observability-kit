@@ -284,6 +284,22 @@
         (expect (health-status results) :to-equal :unhealthy)
         (expect (health-status registry) :to-equal :unhealthy))))
 
+  (it "uses an injected boundary clock and the health definition macro"
+    (let* ((clock (cl-boundary-kit:make-fake-clock
+                   :start 100
+                   :monotonic-start 200))
+           (registry (make-health-registry :clock clock)))
+      (expect (eq (health-registry-clock registry) clock) :to-be-truthy)
+      (define-health-check registry macro_defined (:kind :liveness) (token)
+        (declare (ignore token))
+        :ok)
+      (let ((result (first (run-health-checks registry :kind :liveness))))
+        (expect (health-result-status result) :to-equal :pass)
+        (expect (health-result-value result) :to-equal :ok)
+        (expect (health-result-duration result) :to-equal 0)))
+    (signals observability-error
+      (make-health-registry :clock :not-a-clock)))
+
   (it "keeps liveness and readiness filters distinct"
     (let ((registry (make-health-registry)))
       (register-health-check

@@ -1,3 +1,7 @@
+#.(progn
+    (in-package #:observability-kit)
+    nil)
+
 (defmacro with-instrumentation-context ((context) &body body)
   "Execute BODY with CONTEXT as the current instrumentation context."
   `(let ((*instrumentation-context* (progn

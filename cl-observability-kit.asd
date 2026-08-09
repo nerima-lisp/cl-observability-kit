@@ -8,18 +8,15 @@
   :license "MIT"
   :version "1.0.0"
   :pathname "src"
-  :depends-on ((:version "cl-concurrent-kit" "0.6.1"))
-  ;; Package selection belongs to the ASDF system boundary rather than to
-  ;; individual source files. This keeps loading order declarative.
-  :around-compile (lambda (next)
-                    (let ((*package*
-                           (or (find-package "OBSERVABILITY-KIT") *package*)))
-                      (funcall next)))
+  :depends-on ((:version "cl-concurrent-kit" "0.6.1")
+               (:version "cl-boundary-kit" "2.3.0"))
   :serial t
   :components ((:file "package")
                (:file "conditions")
                (:file "validation-data")
                (:file "validation")
+               (:file "validation-values")
+               (:file "validation-numbers")
                (:file "options")
                (:file "metrics-declarations")
                (:file "metrics-model")
@@ -30,7 +27,10 @@
                (:file "health-declarations")
                (:file "health-model")
                (:file "health-registry")
+               (:file "health-thread")
                (:file "health-execution")
+               (:file "health-status")
+               (:file "health-macros")
                (:file "context-declarations")
                (:file "context")
                (:file "context-macros"))
@@ -43,12 +43,9 @@
   :version "1.0.0"
   :depends-on ("cl-observability-kit")
   :pathname "src"
-  :around-compile (lambda (next)
-                    (let ((*package*
-                           (or (find-package "OBSERVABILITY-KIT/PROMETHEUS") *package*)))
-                      (funcall next)))
   :serial t
-  :components ((:file "prometheus")))
+  :components ((:file "package-prometheus")
+               (:file "prometheus")))
 
 (asdf:defsystem "cl-observability-kit/otlp"
   :description "A transport-neutral OTLP-shaped document adapter."
@@ -57,12 +54,9 @@
   :version "1.0.0"
   :depends-on ("cl-observability-kit")
   :pathname "src"
-  :around-compile (lambda (next)
-                    (let ((*package*
-                           (or (find-package "OBSERVABILITY-KIT/OTLP") *package*)))
-                      (funcall next)))
   :serial t
-  :components ((:file "otlp")))
+  :components ((:file "package-otlp")
+               (:file "otlp")))
 
 (asdf:defsystem "cl-observability-kit/log-kit"
   :description "Optional instrumentation-context bridge for cl-log-kit."
@@ -72,12 +66,9 @@
   :depends-on ("cl-observability-kit"
                (:version "cl-log-kit" "2.2.0"))
   :pathname "src"
-  :around-compile (lambda (next)
-                    (let ((*package*
-                           (or (find-package "OBSERVABILITY-KIT/LOG-KIT") *package*)))
-                      (funcall next)))
   :serial t
-  :components ((:file "log-kit-macros")
+  :components ((:file "package-log-kit")
+               (:file "log-kit-macros")
                (:file "log-kit")))
 
 (asdf:defsystem "cl-observability-kit/test"

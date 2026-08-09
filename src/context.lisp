@@ -1,3 +1,7 @@
+#.(progn
+    (in-package #:observability-kit)
+    nil)
+
 (defun %validate-context-id (value what)
   (when value
     (unless (and (stringp value) (plusp (length value)) (<= (length value) 256))

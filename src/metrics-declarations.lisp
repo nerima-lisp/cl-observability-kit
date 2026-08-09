@@ -1,3 +1,7 @@
+#.(progn
+    (in-package #:observability-kit)
+    nil)
+
 (defparameter *default-histogram-buckets*
   '(0.005d0 0.01d0 0.025d0 0.05d0 0.1d0 0.25d0 0.5d0 1.0d0
     2.5d0 5.0d0 10.0d0)

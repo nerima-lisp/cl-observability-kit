@@ -1,3 +1,7 @@
+#.(progn
+    (in-package #:observability-kit)
+    nil)
+
 (defun %copy-observability-value (value)
   "Copy mutable string values at an observability API boundary."
   (if (stringp value)
@@ -10,7 +14,7 @@
     ((symbolp value) (string-downcase (symbol-name value)))
     (t nil)))
 
-(defun %proper-list-p (object)
+(defun proper-list-p (object)
   "Return true when OBJECT is a finite proper list.
 
 The tortoise-and-hare walk also rejects circular lists without relying on
@@ -89,7 +93,7 @@ LISTP, LENGTH, or MAPCAR to signal an implementation-dependent type error."
   (%copy-observability-value value))
 
 (defun %normalize-label-names (names)
-  (unless (%proper-list-p names)
+  (unless (proper-list-p names)
     (error 'invalid-label-name
            :name names
            :message "Label names must be supplied as a list."))
@@ -100,138 +104,3 @@ LISTP, LENGTH, or MAPCAR to signal an implementation-dependent type error."
              :name names
              :message "Label names must be unique."))
     (sort normalized #'string<)))
-
-(defun %pair-value (pair)
-  (if (and (consp (cdr pair)) (null (cddr pair)))
-      (cadr pair)
-      (cdr pair)))
-
-(defun %label-input-alist (labels)
-  (cond
-    ((null labels) nil)
-    ((and (%proper-list-p labels) (every #'consp labels))
-     (mapcar (lambda (pair) (cons (car pair) (%pair-value pair))) labels))
-    ((%proper-list-p labels)
-     (unless (evenp (length labels))
-       (error 'invalid-label-set
-              :labels labels
-              :reason :odd-plist
-              :message "Labels must be an alist or an even property list."))
-     (loop for (name value) on labels by #'cddr
-           collect (cons name value)))
-    (t
-     (error 'invalid-label-set
-            :labels labels
-            :reason :not-a-list
-            :message "Labels must be an alist or property list."))))
-
-(defun %normalize-labels (defined-names labels max-value-length)
-  (let ((provided (%label-input-alist labels))
-        (seen (make-hash-table :test #'equal))
-        (normalized nil))
-    (dolist (pair provided)
-      (let ((name (%validate-label-name (car pair))))
-        (when (gethash name seen)
-          (error 'invalid-label-set
-                 :labels labels
-                 :reason :duplicate
-                 :message (format nil "Label ~S was supplied more than once." name)))
-        (setf (gethash name seen) t)
-        (unless (member name defined-names :test #'string=)
-          (error 'invalid-label-set
-                 :labels labels
-                 :reason :unknown
-                 :message (format nil "Label ~S is not part of the metric definition." name)))
-        (push (cons name (%validate-label-value name (cdr pair) max-value-length))
-              normalized)))
-    (dolist (name defined-names)
-      (unless (gethash name seen)
-        (error 'invalid-label-set
-               :labels labels
-               :reason :missing
-               :message (format nil "Label ~S is required." name))))
-    (sort normalized #'string< :key #'car)))
-
-(defun %validate-attribute-name (name)
-  (let ((normalized (%designator-string name)))
-    (unless (and normalized (plusp (length normalized)))
-      (error 'unsafe-attribute-name
-             :name name
-             :message "Attribute names must be non-empty strings or symbols."))
-    (when (%sensitive-name-p normalized)
-      (error 'unsafe-attribute-name
-             :name name
-             :message (format nil
-                              "Attribute name ~S is reserved for sensitive data."
-                              name)))
-    normalized))
-
-(defun %normalize-attributes (attributes &key max-value-length)
-  (let ((provided (%label-input-alist attributes))
-        (max-value-length (or max-value-length 1024))
-        (seen (make-hash-table :test #'equal))
-        (normalized nil))
-    (dolist (pair provided)
-      (let ((name (%validate-attribute-name (car pair)))
-            (value (cdr pair)))
-        (when (gethash name seen)
-          (error 'unsafe-attribute-name
-                 :name name
-                 :message (format nil "Attribute ~S was supplied more than once." name)))
-        (setf (gethash name seen) t)
-        (unless (or (null value) (stringp value) (numberp value)
-                    (keywordp value) (symbolp value))
-          (error 'unsafe-attribute-name
-                 :name name
-                 :message (format nil "Attribute ~S has an unsupported value type." name)))
-        (when (and (stringp value) (> (length value) max-value-length))
-          (error 'unsafe-attribute-name
-                 :name name
-                 :message (format nil "Attribute ~S is too long." name)))
-        (push (cons name (%copy-observability-value value)) normalized)))
-    (sort normalized #'string< :key #'car)))
-
-(defun %validate-real (value what)
-  (unless (realp value)
-    (error 'observability-error
-           :message (format nil "~A must be a real number, got ~S." what value)))
-  value)
-
-(defun %finite-float-p (value)
-  (and (= value value)
-       #+sbcl (not (sb-ext:float-infinity-p value))
-       #-sbcl t))
-
-(defun %finite-real-p (value)
-  (and (realp value)
-       (or (not (floatp value))
-           (%finite-float-p value))))
-
-(defun %validate-finite-real (value what)
-  (%validate-real value what)
-  (unless (%finite-real-p value)
-    (error 'observability-error
-           :message (format nil "~A must be finite, got ~S." what value)))
-  value)
-
-(defun %validate-positive-integer (value what)
-  (unless (and (integerp value) (plusp value))
-    (error 'observability-error
-           :message (format nil "~A must be a positive integer, got ~S." what value)))
-  value)
-
-(defun %copy-alist (alist)
-  (mapcar (lambda (pair)
-            (cons (%copy-observability-value (car pair))
-                  (%copy-observability-value (cdr pair))))
-          alist))
-
-(defun %labels-less-p (left right)
-  (loop for left-pair in left
-        for right-pair in right
-        do (cond
-             ((string< (car left-pair) (car right-pair)) (return t))
-             ((string< (car right-pair) (car left-pair)) (return nil))
-             ((string< (cdr left-pair) (cdr right-pair)) (return t))
-             ((string< (cdr right-pair) (cdr left-pair)) (return nil)))
-        finally (return (< (length left) (length right)))))

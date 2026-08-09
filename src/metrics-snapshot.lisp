@@ -1,3 +1,7 @@
+#.(progn
+    (in-package #:observability-kit)
+    nil)
+
 (defun %snapshot-series (metric series)
   (%make-metric-sample
    (%copy-alist (%metric-series-labels series))

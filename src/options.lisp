@@ -1,9 +1,13 @@
+#.(progn
+    (in-package #:observability-kit)
+    nil)
+
 (defun %parse-keyword-options (options allowed what)
   "Validate an OPTIONS plist and return it as an ordered alist.
 
 WHAT is included in diagnostics so public constructors can share one parser
 without hiding which API rejected a malformed option list."
-  (unless (%proper-list-p options)
+  (unless (proper-list-p options)
     (error 'observability-error
            :message (format nil "~A options must be a proper property list."
                             what)))

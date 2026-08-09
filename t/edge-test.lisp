@@ -17,6 +17,11 @@
   (sleep 0.2d0)
   t)
 
+(defun edge-health-await-cancellation (token)
+  (loop until (cancellation-requested-p token)
+        do (sleep 0.001d0))
+  :stopped)
+
 (defun edge-health-slow (token)
   (declare (ignore token))
   (sleep 0.2d0)
@@ -324,6 +329,17 @@
                   nil)
                 (lambda (thread)
                   (declare (ignore thread))
+                  nil)))
+             (failing-cleanup
+               (observability-kit::%make-health-thread-controller
+                (lambda (thread &rest arguments)
+                  (declare (ignore thread arguments))
+                  (error "cleanup join failed"))
+                (lambda (thread)
+                  (declare (ignore thread))
+                  nil)
+                (lambda (thread)
+                  (declare (ignore thread))
                   nil))))
         (expect (typep
                  (observability-kit::%stop-health-thread
@@ -332,7 +348,51 @@
                 :to-be-truthy)
         (expect (observability-kit::%stop-health-thread
                  :fake-thread (make-cancellation-token) check :forced never-alive)
-                :to-be-falsy))))
+                :to-be-falsy)
+        (expect (typep
+                 (observability-kit::%stop-health-thread
+                  :fake-thread (make-cancellation-token) check :forced failing-cleanup)
+                 'error)
+                :to-be-truthy)
+        (let ((controller
+                (observability-kit::%make-health-thread-controller
+                 (lambda (thread &rest arguments)
+                   (declare (ignore thread arguments))
+                   nil)
+                 (lambda (thread)
+                   (declare (ignore thread))
+                   nil)
+                 (lambda (thread)
+                   (declare (ignore thread))
+                   nil)))
+              (registry (make-health-registry)))
+          (let ((timeout-check
+                  (register-health-check registry "fallback-timeout"
+                                         #'edge-health-await-cancellation
+                                         :timeout 0.000001d0))
+                (cancelled-check
+                  (register-health-check registry "fallback-cancelled"
+                                         #'edge-health-cancel
+                                         :timeout 1.0d0)))
+            (flet ((run-one (check)
+                     (let ((result nil))
+                       (let ((observability-kit::*health-thread-controller*
+                               controller))
+                         (observability-kit::%run-health-check
+                          check
+                          (make-cancellation-token)
+                          (health-registry-clock registry)
+                          (lambda (value)
+                            (setf result value))))
+                       result)))
+              (let ((timeout-result (run-one timeout-check))
+                    (cancelled-result (run-one cancelled-check)))
+                (expect (typep (health-result-condition timeout-result)
+                               'health-check-timeout)
+                        :to-be-truthy)
+                (expect (typep (health-result-condition cancelled-result)
+                               'health-check-cancelled)
+                        :to-be-truthy))))))))
 
 (describe "instrumentation context boundaries"
   (it "validates ids, flags, attributes, and detached copies"
@@ -403,9 +463,9 @@
             :to-be-falsy)
     (signals invalid-metric-name
       (observability-kit::%validate-metric-name "__edge"))
-    (expect (observability-kit::%proper-list-p (edge-circular-list))
+    (expect (observability-kit:proper-list-p (edge-circular-list))
             :to-be-falsy)
-    (expect (observability-kit::%proper-list-p (cons :edge :tail))
+    (expect (observability-kit:proper-list-p (cons :edge :tail))
             :to-be-falsy)
     (expect (observability-kit::%labels-less-p
              '(("a" . "x")) '(("b" . "x")))

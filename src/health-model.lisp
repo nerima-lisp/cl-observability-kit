@@ -1,3 +1,7 @@
+#.(progn
+    (in-package #:observability-kit)
+    nil)
+
 (defun make-cancellation-token (&key parent)
   "Create a cancellation token, optionally inheriting PARENT cancellation.
 
@@ -52,6 +56,18 @@ alive."
                               what value))))
   value)
 
+(defun %validate-health-clock (clock)
+  (handler-case
+      (progn
+        (cl-boundary-kit:clock-now clock)
+        (cl-boundary-kit:clock-monotonic clock)
+        clock)
+    (error ()
+      (error 'observability-error
+             :message (format nil
+                              "Health clock must implement the cl-boundary-kit clock protocol, got ~S."
+                              clock)))))
+
 (defun %normalize-health-name (name)
   (let ((normalized (%designator-string name)))
     (unless (and normalized
@@ -97,21 +113,30 @@ alive."
   "Create a registry for independent LIVENESS, READINESS, and STARTUP checks.
 
 DEFAULT-TIMEOUT may be NIL to disable the per-check deadline.  A positive
-CANCELLATION-GRACE-PERIOD is used before the SBCL worker is forcefully
-terminated if it ignores cancellation."
+  CANCELLATION-GRACE-PERIOD is used before the SBCL worker is forcefully
+terminated if it ignores cancellation.  CLOCK supplies wall and monotonic
+time through cl-boundary-kit's public clock protocol."
   (let* ((options (%parse-keyword-options
                    option-list
-                   '(:default-timeout :cancellation-grace-period)
+                   '(:default-timeout :cancellation-grace-period :clock)
                    "MAKE-HEALTH-REGISTRY"))
          (default-timeout (%option-value options :default-timeout 5.0d0))
          (cancellation-grace-period
-           (%option-value options :cancellation-grace-period 0.1d0)))
+           (%option-value options :cancellation-grace-period 0.1d0))
+         (clock (%option-value options :clock (cl-boundary-kit:make-clock))))
     (%validate-health-duration default-timeout "Default health timeout" :allow-nil t)
     (%validate-health-duration cancellation-grace-period
                                "Health cancellation grace period")
+    (%validate-health-clock clock)
     (%make-health-registry
      (cl-concurrent-kit:make-lock :name "observability-health")
      (make-hash-table :test #'equal)
      default-timeout
      cancellation-grace-period
+     clock
      nil)))
+
+(defun health-registry-clock (registry)
+  "Return the clock used for health deadlines and result durations."
+  (check-type registry health-registry)
+  (%health-registry-clock registry))

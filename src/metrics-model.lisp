@@ -1,3 +1,7 @@
+#.(progn
+    (in-package #:observability-kit)
+    nil)
+
 (defun make-metric-registry (&rest option-list)
   "Create an independent registry of metrics.
 

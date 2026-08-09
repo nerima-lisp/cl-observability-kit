@@ -1,3 +1,7 @@
+#.(progn
+    (in-package #:observability-kit)
+    nil)
+
 (defstruct (cancellation-token
             (:constructor %make-cancellation-token
                 (lock cancelled-p reason parent))
@@ -9,12 +13,14 @@
 
 (defstruct (health-registry
             (:constructor %make-health-registry
-                (lock checks default-timeout cancellation-grace-period last-results))
+                (lock checks default-timeout cancellation-grace-period clock
+                 last-results))
             (:conc-name %health-registry-))
   lock
   checks
   default-timeout
   cancellation-grace-period
+  clock
   last-results)
 
 (defstruct (health-check

@@ -1,3 +1,7 @@
+#.(progn
+    (in-package #:observability-kit/log-kit)
+    nil)
+
 (defmacro with-log-kit-context ((context) &body body)
   "Run BODY with CONTEXT fields merged into the dynamic LOG-KIT context."
   (let ((context-var (gensym "CONTEXT-")))
