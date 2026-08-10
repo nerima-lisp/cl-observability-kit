@@ -49,16 +49,30 @@ not serialize or send a wire payload.
 
 ## Install
 
-Make the checkout containing cl-observability-kit.asd visible to ASDF, then
-load the system:
+There is no Quicklisp or Ultralisp distribution; install by making a git
+checkout visible to ASDF.
+
+For a reproducible pin, check out the `v0.1.0` tag:
+
+~~~sh
+git clone --branch v0.1.0 https://github.com/nerima-lisp/cl-observability-kit.git
+~~~
+
+For the current development source, check out `main` instead:
+
+~~~sh
+git clone https://github.com/nerima-lisp/cl-observability-kit.git
+~~~
+
+Either way, make the checkout containing cl-observability-kit.asd visible to
+ASDF, then load the system:
 
 ~~~lisp
 (asdf:load-system "cl-observability-kit")
 ~~~
 
-nix develop provides the pinned development dependencies. This repository
-does not currently publish a release tag, so source-checkout installation is
-the reproducible option documented here.
+nix develop provides the pinned development dependencies for working inside
+the checkout.
 
 ## Documentation
 

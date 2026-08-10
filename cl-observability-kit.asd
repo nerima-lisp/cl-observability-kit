@@ -6,7 +6,7 @@
   :author "Project contributors"
   :maintainer "Project contributors"
   :license "MIT"
-  :version "1.0.0"
+  :version "0.1.0"
   :pathname "src"
   :depends-on ((:version "cl-concurrent-kit" "0.6.1")
                (:version "cl-boundary-kit" "2.3.0"))
@@ -57,7 +57,7 @@
   :description "Prometheus text exposition for cl-observability-kit snapshots."
   :author "Project contributors"
   :license "MIT"
-  :version "1.0.0"
+  :version "0.1.0"
   :depends-on ("cl-observability-kit")
   :pathname "src"
   :serial t
@@ -71,7 +71,7 @@
   :description "A transport-neutral OTLP-shaped document adapter."
   :author "Project contributors"
   :license "MIT"
-  :version "1.0.0"
+  :version "0.1.0"
   :depends-on ("cl-observability-kit")
   :pathname "src"
   :serial t
@@ -82,7 +82,7 @@
   :description "Optional instrumentation-context bridge for cl-log-kit."
   :author "Project contributors"
   :license "MIT"
-  :version "1.0.0"
+  :version "0.1.0"
   :depends-on ("cl-observability-kit"
                (:version "cl-log-kit" "2.2.0"))
   :pathname "src"

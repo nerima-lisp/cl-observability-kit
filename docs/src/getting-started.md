@@ -10,9 +10,9 @@ cl-observability-kit.asd, or enter the Nix development shell:
 nix develop
 ~~~
 
-There is no release tag published in this repository yet. The examples below
-describe loading the current source checkout rather than claiming a release
-pin.
+Pin to the `v0.1.0` tag for a reproducible checkout, or use `main` for the
+current development source. There is no Quicklisp or Ultralisp distribution;
+installation is a git checkout made visible to ASDF.
 
 ## Load the systems
 
