@@ -237,6 +237,8 @@
    #:span-processor
    #:span-processor-p
    #:make-span-processor
+   #:make-simple-span-processor
+   #:make-batch-span-processor
    #:span-processor-on-start
    #:span-processor-on-end
    #:span-processor-force-flush

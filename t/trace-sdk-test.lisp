@@ -188,6 +188,20 @@
               :to-be-truthy)
       (shutdown-tracer-provider provider))))
 
+  (it "validates built-in span processor options"
+    (signals tracing-error
+      (make-simple-span-processor 10))
+    (signals observability-error
+      (make-simple-span-processor #'identity :unknown t))
+    (signals tracing-error
+      (make-batch-span-processor #'identity :schedule-delay 0))
+    (signals tracing-error
+      (make-batch-span-processor #'identity :max-queue-size 0))
+    (signals tracing-error
+      (make-batch-span-processor #'identity :max-export-batch-size 0))
+    (signals tracing-error
+      (make-batch-span-processor #'identity :start :maybe)))
+
   (it "isolates span lifecycle callback and error-handler failures"
     (let* ((handler (lambda (condition argument)
                       (declare (ignore condition argument))
@@ -215,3 +229,111 @@
       (expect (tracer-provider-last-export-error provider) :to-be-truthy)
       (shutdown-tracer-provider provider)
       (expect (tracer-provider-last-export-error provider) :to-be-truthy)))
+
+  (it "exports sampled spans synchronously with the simple span processor"
+    (let ((exports nil)
+          (flushes 0)
+          (shutdowns 0)
+          (errors nil))
+      (let* ((processor
+               (make-simple-span-processor
+                (lambda (records)
+                  (push records exports))
+                :flush (lambda (provider)
+                         (declare (ignore provider))
+                         (incf flushes))
+                :shutdown (lambda (provider)
+                            (declare (ignore provider))
+                            (incf shutdowns))
+                :error-handler (lambda (condition argument)
+                                 (push (list condition argument) errors))))
+             (provider (make-tracer-provider
+                       :span-processors (list processor)))
+             (tracer (make-tracer provider "simple")))
+        (end-span (start-span tracer "simple-span" :parent nil))
+        (expect (length exports) :to-equal 1)
+        (expect (length (first exports)) :to-equal 1)
+        (expect (span-record-name (first (first exports)))
+                :to-equal "simple-span")
+        (expect (force-flush-tracer-provider provider) :to-be-truthy)
+        (expect flushes :to-equal 1)
+        (shutdown-tracer-provider provider)
+        (expect shutdowns :to-equal 1)
+        (expect errors :to-be-falsy))))
+
+  (it "batches sampled spans and drains the queue during force flush"
+    (let ((batches nil)
+          (flushes 0)
+          (shutdowns 0))
+      (let* ((processor
+               (make-batch-span-processor
+                (lambda (records)
+                  (push records batches))
+                :schedule-delay 60d0
+                :max-queue-size 8
+                :max-export-batch-size 2
+                :start nil
+                :flush (lambda (provider)
+                         (declare (ignore provider))
+                         (incf flushes))
+                :shutdown (lambda (provider)
+                            (declare (ignore provider))
+                            (incf shutdowns))))
+             (provider (make-tracer-provider
+                       :span-processors (list processor)))
+             (tracer (make-tracer provider "batch")))
+        (dotimes (index 5)
+          (end-span (start-span tracer (format nil "batch-~D" index)
+                                 :parent nil)))
+        (expect (force-flush-tracer-provider provider) :to-be-truthy)
+        (expect (reduce #'+ batches :initial-value 0 :key #'length)
+                :to-equal 5)
+        (expect (every (lambda (batch) (<= (length batch) 2)) batches)
+                :to-be-truthy)
+        (expect flushes :to-equal 1)
+        (shutdown-tracer-provider provider)
+        (expect shutdowns :to-equal 1)
+        (expect (force-flush-tracer-provider provider) :to-be-falsy))))
+
+  (it "isolates asynchronous batch exporter failures"
+    (let ((errors nil)
+          (export-count 0))
+      (let* ((processor
+               (make-batch-span-processor
+                (lambda (records)
+                  (declare (ignore records))
+                  (incf export-count)
+                  (error "batch exporter failed"))
+                :schedule-delay 60d0
+                :start nil
+                :error-handler (lambda (condition argument)
+                                 (push (list condition argument) errors))))
+             (provider (make-tracer-provider
+                       :span-processors (list processor)))
+             (tracer (make-tracer provider "batch-errors")))
+        (end-span (start-span tracer "failed-batch" :parent nil))
+        (expect (force-flush-tracer-provider provider) :to-be-truthy)
+        (expect export-count :to-equal 1)
+        (expect errors :to-be-truthy)
+        (expect (tracer-provider-last-export-error provider)
+                :to-be-truthy)
+        (shutdown-tracer-provider provider))))
+
+  (it "bounds the batch queue and drops spans after capacity"
+    (let ((exported 0))
+      (let* ((processor
+               (make-batch-span-processor
+                (lambda (records)
+                  (incf exported (length records)))
+                :schedule-delay 60d0
+                :max-queue-size 2
+                :start nil))
+             (provider (make-tracer-provider
+                       :span-processors (list processor)))
+             (tracer (make-tracer provider "bounded-batch")))
+        (dotimes (index 5)
+          (end-span (start-span tracer (format nil "bounded-~D" index)
+                                 :parent nil)))
+        (expect (force-flush-tracer-provider provider) :to-be-truthy)
+        (expect exported :to-equal 2)
+        (shutdown-tracer-provider provider))))

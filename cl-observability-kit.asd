@@ -41,6 +41,7 @@
                (:file "trace-declarations")
                (:file "trace-model")
                (:file "trace-operation")
+               (:file "trace-processors")
                (:file "trace-macros")
                (:file "propagation")
                (:file "propagator")
