@@ -83,6 +83,14 @@
   ((severity :initarg :severity :reader invalid-log-severity-severity))
   (:default-initargs :message "Invalid log severity."))
 
+(define-condition log-provider-shutdown (logging-error)
+  ((provider :initarg :provider :reader log-provider-shutdown-provider))
+  (:default-initargs :message "The log provider has been shut down."))
+
+(define-condition configuration-error (observability-error)
+  ((name :initarg :name :reader configuration-error-name))
+  (:default-initargs :message "The SDK configuration is invalid."))
+
 (define-condition propagation-error (observability-error)
   ())
 

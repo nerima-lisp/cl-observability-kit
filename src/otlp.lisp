@@ -11,6 +11,7 @@
     ((metric-snapshot-p source) (list source))
     ((metric-p source) (list (metric-snapshot source)))
     ((metric-registry-p source) (metric-snapshot source))
+    ((meter-provider-p source) (metric-snapshot source))
     ((null source) nil)
     ((proper-list-p source)
      (unless (every #'metric-snapshot-p source)
@@ -19,9 +20,20 @@
            #'string<
            :key #'observability-kit::%metric-snapshot-name))
     (t
-     (%otlp-error
-      "OTLP source must be a metric, registry, snapshot, or snapshot list; got ~S."
+      (%otlp-error
+      "OTLP source must be a metric, registry, meter provider, snapshot, or snapshot list; got ~S."
       source))))
+
+(defun %snapshot-resource (snapshots)
+  (when snapshots
+    (let ((resource (metric-snapshot-resource (first snapshots))))
+      (dolist (snapshot (rest snapshots))
+        (let ((candidate (metric-snapshot-resource snapshot)))
+          (unless (equal (and resource (resource-attributes resource))
+                         (and candidate (resource-attributes candidate)))
+            (%otlp-error
+             "OTLP metric sources must share one resource; use separate documents for different resources."))))
+      resource)))
 
 (defun %attributes (labels)
   (mapcar (lambda (pair)
@@ -144,19 +156,26 @@ used by the core snapshot to OTLP's per-bucket counts."
 (defun registry->otlp (source &key scope-name scope-version)
   "Return a deterministic OTLP-shaped scope document for SOURCE.
 
-SOURCE may be a registry, metric, snapshot, or snapshot list.  SCOPE-NAME and
-SCOPE-VERSION are metadata only; resource ownership and network export remain
-with the application or another optional integration."
-  (let ((scope
-          (remove nil
-                  (list (and scope-name (cons "name" scope-name))
-                        (and scope-version (cons "version" scope-version))))))
+SOURCE may be a registry, metric, meter provider, snapshot, or snapshot list.
+SCOPE-NAME and SCOPE-VERSION are metadata only.  When snapshots carry one
+resource, the returned document includes that resource; sources containing
+different resources must be exported as separate documents."
+  (let* ((scope
+           (remove nil
+                   (list (and scope-name (cons "name" scope-name))
+                         (and scope-version (cons "version" scope-version)))))
+         (snapshots (%snapshot-list source))
+         (resource (%snapshot-resource snapshots))
+         (document
+           (list (cons "scope" scope)
+                 (cons "metrics"
+                       (mapcar #'metric-snapshot->otlp snapshots)))))
     (unless (every (lambda (pair) (stringp (cdr pair)))
                    scope)
       (%otlp-error "OTLP scope metadata must contain string values."))
-    (list (cons "scope" scope)
-          (cons "metrics"
-                (mapcar #'metric-snapshot->otlp (%snapshot-list source))))))
+    (if resource
+        (cons (cons "resource" (%resource-document resource)) document)
+        document)))
 
 (defun %scope-document (name version schema-url)
   (remove nil

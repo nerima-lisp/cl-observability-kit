@@ -55,11 +55,11 @@ The optional positional amount defaults to one.  The only option is
     (multiple-value-bind (labels labels-supplied-p)
         (%operation-labels remaining)
       (declare (ignore labels-supplied-p))
-      (unless (or (counter-p metric) (gauge-p metric))
+      (unless (or (counter-p metric) (up-down-counter-p metric) (gauge-p metric))
         (error 'metric-operation-error
                :metric metric
                :operation :metric-inc
-               :message "Metric-inc requires a counter or gauge."))
+               :message "Metric-inc requires a counter, up-down counter, or gauge."))
       (%validate-operation-value metric :metric-inc amount "Metric increment")
       (when (and (counter-p metric) (minusp amount))
         (error 'metric-operation-error

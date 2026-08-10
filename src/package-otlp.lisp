@@ -11,6 +11,8 @@
                 #:metric-p
                 #:metric-registry
                 #:metric-registry-p
+                #:meter-provider
+                #:meter-provider-p
                 #:metric-snapshot
                 #:metric-snapshot-p
                 #:metric-snapshot-name
@@ -18,6 +20,7 @@
                 #:metric-snapshot-type
                 #:metric-snapshot-unit
                 #:metric-snapshot-samples
+                #:metric-snapshot-resource
                 #:metric-sample-labels
                 #:metric-sample-value
                 #:metric-sample-count

@@ -47,6 +47,43 @@
   (cl-concurrent-kit:with-lock-held ((%tracer-provider-lock provider))
     (%tracer-provider-last-export-error provider)))
 
+(defun tracer-provider-span-processors (provider)
+  (check-type provider tracer-provider)
+  (cl-concurrent-kit:with-lock-held ((%tracer-provider-lock provider))
+    (copy-list (%tracer-provider-span-processors provider))))
+
+(defun span-processor-on-start (processor)
+  (check-type processor span-processor)
+  (%span-processor-on-start processor))
+
+(defun span-processor-on-end (processor)
+  (check-type processor span-processor)
+  (%span-processor-on-end processor))
+
+(defun span-processor-force-flush (processor)
+  (check-type processor span-processor)
+  (%span-processor-force-flush processor))
+
+(defun span-processor-shutdown (processor)
+  (check-type processor span-processor)
+  (%span-processor-shutdown processor))
+
+(defun span-processor-error-handler (processor)
+  (check-type processor span-processor)
+  (%span-processor-error-handler processor))
+
+(defun register-span-processor (provider processor)
+  "Register PROCESSOR for future spans and return it."
+  (check-type provider tracer-provider)
+  (check-type processor span-processor)
+  (cl-concurrent-kit:with-lock-held ((%tracer-provider-lock provider))
+    (when (%tracer-provider-shutdown-p provider)
+      (error 'tracer-provider-shutdown :provider provider))
+    (setf (%tracer-provider-span-processors provider)
+          (append (%tracer-provider-span-processors provider)
+                  (list processor))))
+  processor)
+
 (defun make-tracer (provider name &rest option-list)
   "Return a cached tracer for NAME, VERSION, and SCHEMA-URL metadata."
   (check-type provider tracer-provider)
@@ -119,6 +156,39 @@
         (logior flags 1)
         (logand flags #xfe))))
 
+(defun %record-span-processor-error (provider processor condition argument)
+  (let ((processor-handler nil)
+        (provider-handler nil))
+    (cl-concurrent-kit:with-lock-held ((%tracer-provider-lock provider))
+      (setf (%tracer-provider-last-export-error provider) condition
+            processor-handler (%span-processor-error-handler processor)
+            provider-handler (%tracer-provider-export-error-handler provider)))
+    (when processor-handler
+      (handler-case
+          (funcall processor-handler condition argument)
+        (error () nil)))
+    (when provider-handler
+      (handler-case
+          (funcall provider-handler condition argument)
+        (error () nil)))))
+
+(defun %call-span-processor (provider processor phase argument)
+  (let ((callback
+          (ecase phase
+            (:on-start (%span-processor-on-start processor))
+            (:on-end (%span-processor-on-end processor))
+            (:force-flush (%span-processor-force-flush processor))
+            (:shutdown (%span-processor-shutdown processor)))))
+    (if (null callback)
+        t
+        (handler-case
+            (progn
+              (funcall callback argument)
+              t)
+          (error (condition)
+            (%record-span-processor-error provider processor condition argument)
+            nil)))))
+
 (defun start-span (tracer name &rest option-list)
   "Start a span and return it.
 
@@ -135,17 +205,20 @@ not retain data or invoke the exporter."
          (span-name (%normalize-span-name name))
          (kind (%normalize-span-kind (%option-value options :kind :internal)))
          (attributes (%normalize-attributes (%option-value options :attributes nil)))
-         (provider (%tracer-provider tracer)))
+         (provider (%tracer-provider tracer))
+         (span nil)
+         (recording-p nil)
+         (processors nil))
     (cl-concurrent-kit:with-lock-held ((%tracer-provider-lock provider))
       (when (%tracer-provider-shutdown-p provider)
         (error 'tracer-provider-shutdown :provider provider))
-      (let* ((decision (%sampler-decision
-                        (%tracer-provider-sampler provider)
-                        parent-context span-name kind attributes))
-             (recording-p (not (eq decision :drop)))
-             (sampled-p (eq decision :record-and-sample))
-             (id-generator (%tracer-provider-id-generator provider))
+      (let* ((id-generator (%tracer-provider-id-generator provider))
              (trace-id (%trace-id-for-parent parent-context id-generator))
+             (decision (%sampler-decision
+                        (%tracer-provider-sampler provider)
+                        parent-context span-name kind attributes trace-id))
+             (current-recording-p (not (eq decision :drop)))
+             (sampled-p (eq decision :record-and-sample))
              (span-id (%generate-trace-id id-generator 16))
              (start-time
                (if (%option-supplied-p options :start-time)
@@ -154,31 +227,38 @@ not retain data or invoke the exporter."
                    (cl-boundary-kit:clock-now (%tracer-provider-clock provider))))
              (start-monotonic
                (cl-boundary-kit:clock-monotonic (%tracer-provider-clock provider))))
-        (%make-span
-         (cl-concurrent-kit:make-lock :name "observability-span")
-         provider
-         tracer
-         span-name
-         kind
-         trace-id
-         span-id
-         (%context-span-id parent-context)
-         (%span-flags parent-context sampled-p)
-         (%context-attributes parent-context)
-         (%context-baggage parent-context)
-         (%context-tracestate parent-context)
-         start-time
-         start-monotonic
-         nil
-         nil
-         :unset
-         nil
-         attributes
-         nil
-         nil
-         recording-p
-         sampled-p
-         nil)))))
+        (setf recording-p current-recording-p
+              processors (copy-list (%tracer-provider-span-processors provider))
+              span
+              (%make-span
+               (cl-concurrent-kit:make-lock :name "observability-span")
+               provider
+               tracer
+               span-name
+               kind
+               trace-id
+               span-id
+               (%context-span-id parent-context)
+               (%span-flags parent-context sampled-p)
+               (%context-attributes parent-context)
+               (%context-baggage parent-context)
+               (%context-tracestate parent-context)
+               start-time
+               start-monotonic
+               nil
+               nil
+               :unset
+               nil
+               attributes
+               nil
+               nil
+               current-recording-p
+               sampled-p
+               nil))))
+    (when recording-p
+      (dolist (processor processors)
+        (%call-span-processor provider processor :on-start span)))
+    span))
 
 (defun span-name (span)
   (check-type span span)
@@ -452,8 +532,9 @@ an EXPORT-ERROR-HANDLER to observe them."
   (check-type span span)
   (let* ((options (%parse-keyword-options
                    option-list '(:end-time :status :status-message)
-                   "END-SPAN"))
+         "END-SPAN"))
          (record nil)
+         (processors nil)
          (exporter nil)
          (provider (%span-provider span)))
     (cl-concurrent-kit:with-lock-held ((%span-lock span))
@@ -481,7 +562,11 @@ an EXPORT-ERROR-HANDLER to observe them."
           (when (%span-recording-p span)
             (setf record (%make-span-record-from-span
                           span end-time end-monotonic status status-message)
-                  exporter (%tracer-provider-exporter provider)))))
+                exporter (%tracer-provider-exporter provider)))))
+    (when record
+      (setf processors (tracer-provider-span-processors provider))
+      (dolist (processor processors)
+        (%call-span-processor provider processor :on-end record)))
     (when (and record exporter)
       (handler-case
           (funcall exporter record)
@@ -500,22 +585,38 @@ an EXPORT-ERROR-HANDLER to observe them."
         nil))))
 
 (defun force-flush-tracer-provider (provider)
-  "Run the configured flush callback, returning true on success."
+  "Run span processor and provider flush callbacks, returning true on success."
   (check-type provider tracer-provider)
-  (let ((callback
-          (cl-concurrent-kit:with-lock-held ((%tracer-provider-lock provider))
-            (%tracer-provider-flush provider))))
-    (or (null callback)
-        (%call-provider-callback provider callback))))
+  (let ((processors nil)
+        (callback nil)
+        (success t)
+        (active-p nil))
+    (cl-concurrent-kit:with-lock-held ((%tracer-provider-lock provider))
+      (unless (%tracer-provider-shutdown-p provider)
+        (setf active-p t
+              processors (copy-list (%tracer-provider-span-processors provider))
+              callback (%tracer-provider-flush provider))))
+    (when active-p
+      (dolist (processor processors)
+        (unless (%call-span-processor provider processor :force-flush provider)
+          (setf success nil)))
+      (unless (or (null callback)
+                  (%call-provider-callback provider callback))
+        (setf success nil))
+      success)))
 
 (defun shutdown-tracer-provider (provider)
-  "Mark PROVIDER shut down and invoke its shutdown callback once."
+  "Mark PROVIDER shut down and invoke processor and provider callbacks once."
   (check-type provider tracer-provider)
-  (let ((callback nil))
+  (let ((processors nil)
+        (callback nil))
     (cl-concurrent-kit:with-lock-held ((%tracer-provider-lock provider))
       (unless (%tracer-provider-shutdown-p provider)
         (setf (%tracer-provider-shutdown-p provider) t
+              processors (copy-list (%tracer-provider-span-processors provider))
               callback (%tracer-provider-shutdown provider))))
+    (dolist (processor processors)
+      (%call-span-processor provider processor :shutdown provider))
     (when callback
       (%call-provider-callback provider callback)))
   provider)

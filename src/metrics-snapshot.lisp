@@ -22,20 +22,83 @@
             (cons (cons +infinity+ (car count-cell))
                   samples)))))))
 
-(defun %snapshot-metric (metric)
-  (cl-concurrent-kit:with-lock-held ((%metric-lock metric))
-    ;; Series order is maintained when a series is created, so snapshots do
-    ;; not repeatedly collect and sort the metric's hash-table values.
-    (let ((series (%metric-series-order metric)))
-      (make-metric-snapshot
-       :name (%copy-observability-value (%metric-name metric))
-       :help (%copy-observability-value (%metric-help metric))
-       :type (%metric-kind metric)
-       :unit (%copy-observability-value (%metric-unit metric))
-       :label-names (copy-list (%metric-label-names metric))
-       :samples (mapcar (lambda (series)
-                          (%snapshot-series metric series))
-                        series)))))
+(defun %snapshot-metric (metric &optional resource)
+  (if (%observable-metric-kind-p (%metric-kind metric))
+      (%snapshot-observable-metric metric resource)
+      (cl-concurrent-kit:with-lock-held ((%metric-lock metric))
+        ;; Series order is maintained when a series is created, so snapshots do
+        ;; not repeatedly collect and sort the metric's hash-table values.
+        (let ((series (%metric-series-order metric))
+              (registry (%metric-registry metric)))
+          (make-metric-snapshot
+           :name (%copy-observability-value (%metric-name metric))
+           :help (%copy-observability-value (%metric-help metric))
+           :type (%metric-kind metric)
+           :unit (%copy-observability-value (%metric-unit metric))
+           :label-names (copy-list (%metric-label-names metric))
+           :samples (mapcar (lambda (series)
+                              (%snapshot-series metric series))
+                            series)
+           :resource (and resource
+                          (make-resource
+                           :attributes (resource-attributes resource)))
+           :scope-name (%copy-observability-value
+                        (%metric-registry-scope-name registry))
+           :scope-version (%copy-observability-value
+                           (%metric-registry-scope-version registry))
+           :scope-schema-url (%copy-observability-value
+                              (%metric-registry-scope-schema-url registry)))))))
+
+(defun %snapshot-observable-metric (metric &optional resource)
+  (let ((series-table (make-hash-table :test #'equal))
+        (series-order nil)
+        (registry (%metric-registry metric)))
+    (flet ((observe (value &key labels)
+             (%validate-operation-value metric :metric-observe value
+                                        "Observable metric value")
+             (when (and (observable-counter-p metric) (minusp value))
+               (error 'metric-operation-error
+                      :metric metric
+                      :operation :metric-observe
+                      :message "Observable counters cannot report negative values."))
+             (let ((normalized-labels (%normalized-operation-labels metric labels)))
+               (let ((series (gethash normalized-labels series-table)))
+                 (unless series
+                   (when (>= (hash-table-count series-table)
+                             (%metric-cardinality-limit metric))
+                     (error 'metric-cardinality-exceeded
+                            :name (%metric-name metric)
+                            :limit (%metric-cardinality-limit metric)
+                            :labels normalized-labels
+                            :message (format nil
+                                             "Metric ~S exceeded its cardinality limit of ~D."
+                                             (%metric-name metric)
+                                             (%metric-cardinality-limit metric))))
+                   (setf series (%empty-series (%metric-kind metric) nil
+                                                normalized-labels)
+                         (gethash normalized-labels series-table) series
+                         series-order (%insert-metric-series series-order series)))
+               (setf (%metric-series-value series) value)
+               value))))
+      (funcall (%metric-callback metric) #'observe))
+    (make-metric-snapshot
+     :name (%copy-observability-value (%metric-name metric))
+     :help (%copy-observability-value (%metric-help metric))
+     :type (%metric-kind metric)
+     :unit (%copy-observability-value (%metric-unit metric))
+     :label-names (copy-list (%metric-label-names metric))
+     :samples (mapcar (lambda (series)
+                        (%snapshot-series metric series))
+                      series-order)
+     :resource (and resource
+                    (make-resource
+                     :attributes (resource-attributes resource)))
+     :scope-name (%copy-observability-value
+                  (%metric-registry-scope-name registry))
+     :scope-version (%copy-observability-value
+                     (%metric-registry-scope-version registry))
+     :scope-schema-url (%copy-observability-value
+                        (%metric-registry-scope-schema-url registry)))))
 
 (defun %copy-metric-sample (sample)
   (if (metric-sample-p sample)
@@ -72,6 +135,24 @@
   (check-type snapshot metric-snapshot)
   (mapcar #'%copy-metric-sample (%metric-snapshot-samples snapshot)))
 
+(defun metric-snapshot-resource (snapshot)
+  (check-type snapshot metric-snapshot)
+  (let ((resource (%metric-snapshot-resource snapshot)))
+    (and resource
+         (make-resource :attributes (resource-attributes resource)))))
+
+(defun metric-snapshot-scope-name (snapshot)
+  (check-type snapshot metric-snapshot)
+  (%copy-observability-value (%metric-snapshot-scope-name snapshot)))
+
+(defun metric-snapshot-scope-version (snapshot)
+  (check-type snapshot metric-snapshot)
+  (%copy-observability-value (%metric-snapshot-scope-version snapshot)))
+
+(defun metric-snapshot-scope-schema-url (snapshot)
+  (check-type snapshot metric-snapshot)
+  (%copy-observability-value (%metric-snapshot-scope-schema-url snapshot)))
+
 (defun metric-sample-labels (sample)
   (check-type sample metric-sample)
   (%copy-alist (%metric-sample-labels sample)))
@@ -93,7 +174,7 @@
   (%copy-alist (%metric-sample-buckets sample)))
 
 (defun metric-snapshot (object)
-  "Return a deterministic snapshot of one METRIC or every registry metric.
+  "Return a deterministic snapshot of one metric source.
 
 Registry snapshots are ordered by metric name.  Samples are ordered by their
 normalized label pairs, and all returned strings and lists are detached copies."
@@ -102,5 +183,36 @@ normalized label pairs, and all returned strings and lists are detached copies."
      (%snapshot-metric object))
     ((metric-registry-p object)
      (mapcar #'%snapshot-metric (metric-registry-metrics object)))
+    ((meter-p object)
+     (mapcar (lambda (metric)
+               (%snapshot-metric
+                metric
+                (meter-provider-resource (%meter-provider object))))
+             (metric-registry-metrics (%meter-registry object))))
+    ((meter-provider-p object)
+     (let (meters resource)
+       (cl-concurrent-kit:with-lock-held ((%meter-provider-lock object))
+         (setf meters
+               (sort (loop for meter being the hash-values of
+                                     (%meter-provider-meters object)
+                           collect meter)
+                     (lambda (left right)
+                       (or (string< (%meter-name left) (%meter-name right))
+                           (and (string= (%meter-name left) (%meter-name right))
+                                (string< (or (%meter-version left) "")
+                                         (or (%meter-version right) ""))))))
+               resource
+               (make-resource
+                :attributes
+                (resource-attributes (%meter-provider-resource object)))))
+       (mapcan (lambda (meter)
+                 (mapcar (lambda (metric)
+                           (%snapshot-metric
+                            metric
+                            resource))
+                         (metric-registry-metrics (%meter-registry meter))))
+               meters)))
     (t
-     (error 'type-error :datum object :expected-type '(or metric metric-registry)))))
+     (error 'type-error
+            :datum object
+            :expected-type '(or metric metric-registry meter meter-provider)))))

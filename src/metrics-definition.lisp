@@ -32,6 +32,34 @@
                :message "Histogram buckets must be strictly increasing."))
       (copy-list normalized))))
 
+(defun %metric-definition-registry (owner)
+  (cond
+    ((metric-registry-p owner)
+     owner)
+    ((meter-p owner)
+     (%meter-registry owner))
+    (t
+     (error 'type-error
+            :datum owner
+            :expected-type '(or metric-registry meter)))))
+
+(defun %observable-metric-kind-p (kind)
+  (member kind '(:observable-counter :observable-gauge
+                 :observable-up-down-counter)
+          :test #'eq))
+
+(defun %normalize-metric-callback (kind callback supplied-p)
+  (when (and supplied-p (not (%observable-metric-kind-p kind)))
+    (error 'observability-error
+           :message "Metric callbacks are only valid for observable metrics."))
+  (when (%observable-metric-kind-p kind)
+    (unless (and supplied-p
+                 (or (functionp callback)
+                     (and (symbolp callback) (fboundp callback))))
+      (error 'observability-error
+             :message "Observable metrics require a function callback.")))
+  callback)
+
 (defun %empty-series (kind buckets labels)
   (%make-metric-series labels
                        0
@@ -40,19 +68,22 @@
                        (when (eq kind :histogram)
                          (make-list (1+ (length buckets)) :initial-element 0))))
 
-(defun %compatible-metric-p (metric kind help unit label-names cardinality-limit buckets)
+(defun %compatible-metric-p
+    (metric kind help unit label-names cardinality-limit buckets callback)
   (and (eq (%metric-kind metric) kind)
        (string= (%metric-help metric) help)
        (equal (%metric-unit metric) unit)
        (equal (%metric-label-names metric) label-names)
        (= (%metric-cardinality-limit metric) cardinality-limit)
-       (equal (%metric-histogram-buckets metric) buckets)))
+       (equal (%metric-histogram-buckets metric) buckets)
+       (equal (%metric-callback metric) callback)))
 
-(defun %define-metric (registry kind name &rest option-list)
-  (check-type registry metric-registry)
+(defun %define-metric (owner kind name &rest option-list)
+  (let ((registry (%metric-definition-registry owner)))
   (let* ((options (%parse-keyword-options
                    option-list
-                   '(:help :unit :label-names :cardinality-limit :buckets)
+                   '(:help :unit :label-names :cardinality-limit :buckets
+                     :callback)
                    "DEFINE-METRIC"))
          (help (%option-value options :help nil))
          (unit (%option-value options :unit nil))
@@ -71,7 +102,12 @@
                (%metric-registry-default-cardinality-limit registry)))
          (normalized-buckets (when (eq kind :histogram)
                                (%normalize-buckets
-                                (%option-value options :buckets nil)))))
+                                (%option-value options :buckets nil))))
+         (normalized-callback
+           (%normalize-metric-callback
+            kind
+            (%option-value options :callback nil)
+            (%option-supplied-p options :callback))))
     (cl-concurrent-kit:with-lock-held ((%metric-registry-lock registry))
       (let ((existing (gethash normalized-name
                                 (%metric-registry-metrics registry))))
@@ -79,7 +115,7 @@
           (existing
            (unless (%compatible-metric-p existing kind normalized-help normalized-unit
                                           normalized-label-names normalized-limit
-                                          normalized-buckets)
+                                          normalized-buckets normalized-callback)
              (error 'metric-definition-conflict
                     :name normalized-name
                     :message (format nil
@@ -93,10 +129,12 @@
                           (make-hash-table :test #'equal)
                           nil
                           (cl-concurrent-kit:make-lock :name normalized-name)
-                          normalized-buckets)))
-             (when (null normalized-label-names)
+                          normalized-buckets
+                          normalized-callback)))
+             (when (and (null normalized-label-names)
+                        (not (%observable-metric-kind-p kind)))
                (let ((series (%empty-series kind normalized-buckets nil)))
                  (setf (gethash nil (%metric-series metric)) series
                        (%metric-series-order metric) (list series))))
              (setf (gethash normalized-name (%metric-registry-metrics registry)) metric)
-             metric)))))))
+             metric))))))))

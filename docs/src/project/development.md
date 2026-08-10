@@ -4,7 +4,7 @@
 
 From the repository root, the standard development commands are:
 
-```sh
+~~~sh
 nix develop
 nix run .#test
 sbcl --script run-tests.lisp
@@ -12,27 +12,27 @@ sbcl --script run-coverage.lisp
 nix flake check
 nix build .#docs
 nix fmt
-```
+~~~
 
-`nix flake show` exposes the test app as `.#test` (`nix run .#test`), the
-repository checks, the formatter, the documentation site as `.#docs`, and the
-package for the supported systems. The direct SBCL scripts are useful when
-diagnosing ASDF or test-runner behavior. The test system uses `cl-weave` and
-rejects an empty or partially non-runnable test selection.
+nix flake show exposes the test app as .#test, the repository checks, the
+formatter, the documentation site as .#docs, and the package for the
+supported systems. The direct SBCL scripts are useful when diagnosing ASDF
+or test-runner behavior. The test system uses cl-weave and rejects an empty
+or partially non-runnable test selection.
 
-The Nix shell provides the pinned `paredit-cli` executable as `paredit` for
+The Nix shell provides the pinned paredit-cli executable as paredit for
 read-only structural validation and analysis. Keep generated build output and
 coverage artifacts out of the repository.
 
 ## Test and coverage boundary
 
-`run-tests.lisp` bootstraps the local source registry, loads the test system,
-and runs the complete cl-weave suite. `run-coverage.lisp` uses SBCL coverage
+run-tests.lisp bootstraps the local source registry, loads the test system,
+and runs the complete cl-weave suite. run-coverage.lisp uses SBCL coverage
 instrumentation and asks cl-weave for 100% expression and branch coverage.
 The executable runtime files are included explicitly; these declaration and
 macro-expansion files are excluded from runtime instrumentation:
 
-```text
+~~~text
 src/package.lisp
 src/conditions.lisp
 src/validation-data.lisp
@@ -50,64 +50,70 @@ src/log-kit-macros.lisp
 src/package-prometheus.lisp
 src/package-otlp.lisp
 src/package-log-kit.lisp
-```
+~~~
 
 The excluded files are still exercised through compilation/loading and public
 boundary tests. The coverage policy is therefore a runtime acceptance
 boundary, not a claim that every source form receives SBCL instrumentation.
 
-Coverage writes `coverage-report/` and the raw `coverage.sexp`. The filtered
+Coverage writes coverage-report/ and the raw coverage.sexp. The filtered
 report is the review artifact; the raw file may include dependency pathnames
-and must not be treated as application telemetry. Set
-`CL_WEAVE_PROPERTY_TESTS` and `CL_WEAVE_PROPERTY_SEED` to reproduce property
-tests.
+and must not be treated as application telemetry. Set CL_WEAVE_PROPERTY_TESTS
+and CL_WEAVE_PROPERTY_SEED to reproduce property tests.
 
 ## Performance checks
 
 Run the repeatable SBCL workload benchmark and allocation profile from the
 repository root:
 
-```sh
+~~~sh
 nix develop --command sbcl --script scripts/performance-benchmark.lisp
 nix develop --command sbcl --script scripts/performance-profile.lisp
-```
+~~~
 
 The benchmark reports elapsed time and allocated bytes for metric updates,
 snapshots, Prometheus exposition, OTLP conversion, and context capture. It
-also checks that the exporter workloads produce non-empty Prometheus and OTLP
+also checks that exporter workloads produce non-empty Prometheus and OTLP
 outputs. Compare runs on the same implementation and machine; the profile is
 an allocation hotspot signal, not a substitute for functional tests.
 
 ## Documentation checks
 
-The site configuration is `docs/mkdocs.yml`, and its source is under
-`docs/src/`. With MkDocs Material installed, build it strictly with:
+The site configuration is docs/mkdocs.yml, and its source is under docs/src/.
+With MkDocs Material installed, build it strictly with:
 
-```sh
+~~~sh
 mkdocs build --strict -f docs/mkdocs.yml
-```
+~~~
 
-The flake exposes the rendered site as `.#docs`; its build uses MkDocs Material
-with `--strict` and also asserts that `index.html` was produced. Verify the
-flake artifact itself when reviewing a docs change:
+The flake exposes the rendered site as .#docs; its build uses MkDocs Material
+with --strict and asserts that index.html was produced. Verify the flake
+artifact itself when reviewing a docs change:
 
-```sh
+~~~sh
 nix build .#docs
 test -L result
 find -L result -type f -size +0c -print | rg -m 1 .
-```
+~~~
 
-## Source layout
+## Source and test layout
 
 The core source is split by responsibility: metric model, definition,
-operation, and snapshot files; health model, registry, thread, and execution
-files; context, resource, trace, propagation, structured-log, and HTTP
+operation, snapshot, SDK provider/reader, and periodic reader files; health
+model, registry, thread, and execution files; context, resource, trace,
+sampler, propagation, structured-log, log SDK, configuration, and HTTP
 semantic-convention files. Prometheus source selection, formatting, and
 sample emission are separate files, as are OTLP conversion and the optional
-`cl-log-kit` bridge. Tests live in `t/` and are loaded through the
-`cl-observability-kit/test` system.
+cl-log-kit bridge.
+
+Tests live in t/ and are loaded through the cl-observability-kit/test system.
+Metric SDK and periodic lifecycle contracts live beside trace SDK, log SDK,
+propagation, and configuration contracts. When adding a public lifecycle
+callback, include tests for success, callback failure isolation, repeated
+flush, shutdown, and detached data.
 
 When public semantics change, update the API and architecture pages together
 with the README entry point. Keep HTTP clients and servers, wire encoding,
-network exporter lifecycle, logger sinks, and provider-specific policy in the
-application that integrates this package.
+network exporter lifecycle, logger sinks, batch/retry policy, and
+provider-specific deployment policy in the application or integration that
+owns them.

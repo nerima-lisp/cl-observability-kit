@@ -90,8 +90,8 @@
            (provider (make-tracer-provider
                       :id-generator
                       (fixed-id-generator
-                       (list (make-string 32 :initial-element #\z)
-                             (make-string 16 :initial-element #\z)
+                       (list (make-string 32 :initial-element #\f)
+                             (make-string 16 :initial-element #\f)
                              (make-string 32 :initial-element #\a)
                              (make-string 16 :initial-element #\a)))
                       :exporter (lambda (record) (push record records))))

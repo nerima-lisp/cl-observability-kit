@@ -12,7 +12,8 @@ readable and removes the old runtime string/designator compatibility surface."
   (string-downcase (symbol-name name)))
 
 (defun %validate-metric-definition-options (options)
-  (let ((accepted '(:help :unit :label-names :cardinality-limit :buckets))
+  (let ((accepted '(:help :unit :label-names :cardinality-limit :buckets
+                    :callback))
         (seen '()))
     (unless (evenp (length options))
       (error 'program-error))
@@ -64,6 +65,12 @@ series cannot race another operation for the same metric."
   (%validate-metric-definition-options options)
   `(%define-metric ,registry :counter ,(%static-metric-name name) ,@options))
 
+(defmacro define-up-down-counter (registry name &rest options)
+  "Define a counter that may be incremented or decremented."
+  (%validate-metric-definition-options options)
+  `(%define-metric ,registry :up-down-counter ,(%static-metric-name name)
+                   ,@options))
+
 (defmacro define-gauge (registry name &rest options)
   "Define a gauge named by the symbol NAME in REGISTRY."
   (%validate-metric-definition-options options)
@@ -73,3 +80,21 @@ series cannot race another operation for the same metric."
   "Define a histogram named by the symbol NAME in REGISTRY."
   (%validate-metric-definition-options options)
   `(%define-metric ,registry :histogram ,(%static-metric-name name) ,@options))
+
+(defmacro define-observable-counter (registry name &rest options)
+  "Define a callback-driven observable counter."
+  (%validate-metric-definition-options options)
+  `(%define-metric ,registry :observable-counter ,(%static-metric-name name)
+                   ,@options))
+
+(defmacro define-observable-gauge (registry name &rest options)
+  "Define a callback-driven observable gauge."
+  (%validate-metric-definition-options options)
+  `(%define-metric ,registry :observable-gauge ,(%static-metric-name name)
+                   ,@options))
+
+(defmacro define-observable-up-down-counter (registry name &rest options)
+  "Define a callback-driven observable up-down counter."
+  (%validate-metric-definition-options options)
+  `(%define-metric ,registry :observable-up-down-counter
+                   ,(%static-metric-name name) ,@options))

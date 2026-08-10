@@ -2,10 +2,20 @@
     (in-package #:observability-kit)
     nil)
 
+(defstruct (span-processor
+            (:constructor %make-span-processor
+                (on-start on-end force-flush shutdown error-handler))
+            (:conc-name %span-processor-))
+  on-start
+  on-end
+  force-flush
+  shutdown
+  error-handler)
+
 (defstruct (tracer-provider
             (:constructor %make-tracer-provider
                 (lock tracers resource clock monotonic-units-per-second
-                 id-generator sampler exporter flush shutdown
+                 id-generator sampler span-processors exporter flush shutdown
                  export-error-handler last-export-error shutdown-p))
             (:conc-name %tracer-provider-))
   lock
@@ -15,6 +25,7 @@
   monotonic-units-per-second
   id-generator
   sampler
+  span-processors
   exporter
   flush
   shutdown

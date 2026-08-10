@@ -55,6 +55,41 @@
               (observability-kit/otlp:registry->otlp
                (cons snapshot snapshot)))))))))
 
+  (it "carries a meter provider resource into its OTLP document"
+    (let* ((provider
+             (make-meter-provider
+              :resource (make-resource
+                         :attributes '(("service.name" . "orders"))))
+              )
+           (meter (make-meter provider "orders"))
+           (counter (define-counter meter requests_total)))
+      (metric-inc counter)
+      (let* ((document (observability-kit/otlp:registry->otlp provider))
+             (resource (string-alist-value "resource" document)))
+        (expect (string-alist-value "attributes" resource)
+                :to-equal '(( ("key" . "service.name")
+                              ("value" . "orders")))))))
+
+  (it "rejects snapshots from different resources in one document"
+    (let* ((provider-a
+             (make-meter-provider
+              :resource (make-resource
+                         :attributes '(("service.name" . "orders")))))
+           (provider-b
+             (make-meter-provider
+              :resource (make-resource
+                         :attributes '(("service.name" . "payments")))))
+           (counter-a (define-counter (make-meter provider-a "orders")
+                                      requests_total))
+           (counter-b (define-counter (make-meter provider-b "payments")
+                                      requests_total)))
+      (metric-inc counter-a)
+      (metric-inc counter-b)
+      (signals observability-error
+        (observability-kit/otlp:registry->otlp
+         (append (metric-snapshot provider-a)
+                 (metric-snapshot provider-b))))))
+
 (describe "cl-log-kit integration"
   (it "adds context fields without taking ownership of logging"
     (let ((records nil))

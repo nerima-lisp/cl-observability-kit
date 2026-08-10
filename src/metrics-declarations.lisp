@@ -9,17 +9,21 @@
 
 (defstruct (metric-registry
             (:constructor %make-metric-registry
-                (lock metrics default-cardinality-limit max-label-value-length))
+                (lock metrics default-cardinality-limit max-label-value-length
+                 scope-name scope-version scope-schema-url))
             (:conc-name %metric-registry-))
   lock
   metrics
   default-cardinality-limit
-  max-label-value-length)
+  max-label-value-length
+  scope-name
+  scope-version
+  scope-schema-url)
 
 (defstruct (metric
             (:constructor %make-metric
                 (kind registry name help unit label-names cardinality-limit
-                 series series-order lock histogram-buckets))
+                 series series-order lock histogram-buckets callback))
             (:conc-name %metric-))
   kind
   registry
@@ -31,7 +35,8 @@
   series
   series-order
   lock
-  histogram-buckets)
+  histogram-buckets
+  callback)
 
 (defstruct (metric-series
             (:constructor %make-metric-series (labels value count sum bucket-counts))
@@ -49,7 +54,11 @@
   type
   unit
   label-names
-  samples)
+  samples
+  resource
+  scope-name
+  scope-version
+  scope-schema-url)
 
 (defstruct (metric-sample
             (:constructor %make-metric-sample
@@ -60,6 +69,31 @@
   count
   sum
   buckets)
+
+(defstruct (meter-provider
+            (:constructor %make-meter-provider
+                (lock meters readers resource registry-options flush shutdown
+                 error-handler shutdown-p last-error))
+            (:conc-name %meter-provider-))
+  lock
+  meters
+  readers
+  resource
+  registry-options
+  flush
+  shutdown
+  error-handler
+  shutdown-p
+  last-error)
+
+(defstruct (meter
+            (:constructor %make-meter (provider name version schema-url registry))
+            (:conc-name %meter-))
+  provider
+  name
+  version
+  schema-url
+  registry)
 
 (defparameter +infinity+ :infinity
   "The exact upper-bound marker for a histogram's final bucket.")

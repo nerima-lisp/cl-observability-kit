@@ -2,49 +2,49 @@
 
 ## Prerequisites
 
-The package follows the current `cl-concurrent-kit` stack and targets SBCL.
+The package follows the current cl-concurrent-kit stack and targets SBCL.
 Use an ASDF setup that can see the checkout containing
-`cl-observability-kit.asd`, or enter the Nix development shell:
+cl-observability-kit.asd, or enter the Nix development shell:
 
-```sh
+~~~sh
 nix develop
-```
+~~~
 
 There is no release tag published in this repository yet. The examples below
-therefore describe loading the current source checkout rather than claiming a
-release pin.
+describe loading the current source checkout rather than claiming a release
+pin.
 
 ## Load the systems
 
 Load the core first. Integration systems are independent and can be loaded
-only when they are needed:
+only when needed:
 
-```lisp
+~~~lisp
 (asdf:load-system "cl-observability-kit")
 (asdf:load-system "cl-observability-kit/prometheus")
 ;; Optional:
 ;; (asdf:load-system "cl-observability-kit/otlp")
 ;; (asdf:load-system "cl-observability-kit/log-kit")
-```
+~~~
 
-The core has no HTTP client/server, network exporter, or `cl-log-kit`
-dependency. It does provide span lifecycle, context propagation, structured
-log records, and HTTP semantic-convention helpers. The Prometheus system
-renders text, the OTLP system returns transport-neutral Common Lisp data, and
-the `/log-kit` system maps context fields into the existing `cl-log-kit`
-context.
+The core has no HTTP client/server, network exporter, or cl-log-kit
+dependency. It provides validated telemetry data, provider and processor
+lifecycle, context propagation, structured log records, and HTTP
+semantic-convention helpers. The Prometheus system renders text, the OTLP
+system returns transport-neutral Common Lisp data, and the log-kit system maps
+context fields into the existing cl-log-kit context.
 
-## Record a metric
+## Record metrics
 
-Define metrics during application setup. Names are symbols, and definition
+Define instruments during application setup. Names are symbols and definition
 options are checked when the macro expands:
 
-```lisp
+~~~lisp
 (defparameter *registry* (observability-kit:make-metric-registry))
 
 (defparameter *requests*
   (observability-kit:define-counter
-   *registry* requests_total
+   *registry* requests-total
    :help "Completed requests."
    :label-names '("method" "status")))
 
@@ -54,18 +54,66 @@ options are checked when the macro expands:
 
 (format t "~A"
         (observability-kit/prometheus:render-prometheus *registry*))
-```
+~~~
 
-Use `define-gauge` with `metric-set` or `metric-inc` for a current value, and
-`define-histogram` with `metric-observe` for exact count, sum, and cumulative
-bucket data. Counters accept finite non-negative real increments; gauges and
-histograms accept finite real values. Label values are strings, each registry
-has a maximum label-value length of 256 by default, and each metric has a
-cardinality limit of 1000 by default.
+Use define-up-down-counter when a value may increase or decrease, and
+define-gauge with metric-set or metric-inc for a current value. Use
+define-histogram with metric-observe for exact count, sum, and cumulative
+bucket data. Observable instruments receive a callback that calls the
+provided observe function during collection.
 
-An unlabelled metric exposes an initial zero sample. A labelled series is
-created when its complete declared label set is first updated. Snapshots keep
-the supplied Common Lisp numbers exact and sort their output deterministically.
+Label values are strings, every labelled update must provide the complete
+declared label set, and each registry has a maximum label-value length of 256
+by default. Each metric has a cardinality limit of 1000 by default. Snapshots
+are detached and sorted deterministically.
+
+### Meter providers and readers
+
+Use a meter provider when instrumentation scopes and reader lifecycle matter:
+
+~~~lisp
+(let* ((provider (observability-kit:make-meter-provider
+                  :resource
+                  (observability-kit:make-resource
+                   :attributes '(("service.name" . "orders")))))
+       (meter (observability-kit:make-meter provider "orders"))
+       (registry (observability-kit:meter-registry meter))
+       (reader
+         (observability-kit:make-metric-reader
+          provider
+          :exporter
+          (lambda (snapshots)
+            ;; Hand detached snapshots to an application exporter.
+            (declare (ignore snapshots))
+            t))))
+  (observability-kit:define-counter registry requests-total)
+  (observability-kit:force-flush-metric-reader reader)
+  (observability-kit:shutdown-meter-provider provider))
+~~~
+
+The reader exporter receives a detached list of metric snapshots. A reader
+created from a meter provider is registered with that provider, so provider
+flush and shutdown also reach it. A periodic reader can collect the same
+source:
+
+~~~lisp
+(let* ((reader
+         (observability-kit:make-periodic-metric-reader
+          *registry*
+          :interval 30.0d0
+          :start nil
+          :exporter (lambda (snapshots)
+                      (declare (ignore snapshots))
+                      t))))
+  (observability-kit:start-periodic-metric-reader reader)
+  (observability-kit:force-flush-periodic-metric-reader reader)
+  (observability-kit:shutdown-periodic-metric-reader reader))
+~~~
+
+The periodic interval is in seconds and defaults to 60.0d0. Shutdown stops
+and joins the worker before returning. Reader and provider callback failures
+are isolated, retained as last-error state, and optionally sent to an
+error-handler.
 
 ## Run a health check
 
@@ -73,7 +121,7 @@ Health checks are explicit observations. Register a check once, run the
 selected kind from an application route or scheduler, and map the result to
 the application's response:
 
-```lisp
+~~~lisp
 (defparameter *health* (observability-kit:make-health-registry))
 
 (observability-kit:define-health-check
@@ -86,20 +134,13 @@ the application's response:
 (observability-kit:run-health-checks *health* :kind :readiness)
 (observability-kit:health-status *health* :kind :readiness)
 ;; => :HEALTHY after the successful run
-```
+~~~
 
-`define-health-check` is a macro: NAME is a source-level symbol and its
-options are checked at macroexpansion time, mirroring `define-counter`,
-`define-gauge`, and `define-histogram`. Use the underlying
-`register-health-check` function directly when the name or check function is
-only known at runtime.
-
-The supported kinds are `:liveness`, `:readiness`, and `:startup`. Each check
+The supported kinds are :liveness, :readiness, and :startup. Each check
 receives a child cancellation token and produces an independent result. A
-timeout first requests cooperative cancellation and then applies the
-configured grace period; on SBCL, a worker that remains alive is terminated
-and checked. Before a kind has run, its registry status is `:UNKNOWN`.
-`health-status` does not start a check implicitly.
+timeout requests cooperative cancellation and then applies the configured
+grace period. Before a kind has run, its registry status is :UNKNOWN.
+health-status does not start a check implicitly.
 
 ## Carry context explicitly
 
@@ -107,79 +148,163 @@ Instrumentation context is immutable by convention and dynamically scoped.
 Worker threads do not inherit a caller's current context implicitly. Capture
 and install it at the worker boundary when propagation is intended:
 
-```lisp
+~~~lisp
 (let ((captured (observability-kit:capture-instrumentation-context)))
   (observability-kit:call-with-captured-instrumentation-context
    captured
    (lambda ()
      ;; Work that should observe the captured context.
      nil)))
-```
+~~~
 
 Do not place credentials, raw headers, personal information, or unbounded
 user-controlled values in labels or context attributes. Validation rejects
 common sensitive names, but callers remain responsible for classification and
 redaction.
 
-## Record a span and correlated log
+## Record spans
 
 Create one provider per application boundary, then create tracers for the
-instrumentation scopes that use it. The exporter callback receives a detached
-`span-record` when a recorded span ends; it can hand that record to an
-application exporter or to the OTLP adapter.
+instrumentation scopes that use it. A span processor sees lifecycle events,
+and the exporter receives a detached span record when a recorded span ends:
 
-```lisp
-(let ((exported nil))
-  (let* ((provider
-           (observability-kit:make-tracer-provider
-            :resource
-            (observability-kit:make-resource
-             :attributes '(("service.name" . "orders")))
-            :exporter (lambda (record) (push record exported))))
-         (tracer (observability-kit:make-tracer provider "orders")))
-    (observability-kit:with-span (root tracer "GET /orders" :kind :server)
-      (observability-kit:span-set-http-request
-       root "GET" :route "/orders" :scheme "https")
-      (observability-kit:make-log-record
-       :severity :info :body "request started")
-      (observability-kit:span-set-http-response root 200))
-    (observability-kit:shutdown-tracer-provider provider)
-    exported))
-```
+~~~lisp
+(let* ((processor
+         (observability-kit:make-span-processor
+          :on-end (lambda (record)
+                    ;; Hand the detached record to an application exporter.
+                    (declare (ignore record))
+                    t)))
+       (provider
+         (observability-kit:make-tracer-provider
+          :resource
+          (observability-kit:make-resource
+           :attributes '(("service.name" . "orders")))
+          :span-processors (list processor)))
+       (tracer (observability-kit:make-tracer provider "orders")))
+  (observability-kit:with-span
+      (root tracer "GET /orders" :kind :server)
+    (observability-kit:span-set-http-request
+     root "GET" :route "/orders" :scheme "https")
+    (observability-kit:span-set-http-response root 200))
+  (observability-kit:force-flush-tracer-provider provider)
+  (observability-kit:shutdown-tracer-provider provider))
+~~~
 
-`with-span` binds the current span and instrumentation context, records a
+with-span binds the current span and instrumentation context, records a
 condition as an exception on error, and ends the span on every exit path. Use
-`:parent nil` for an explicit root span or pass a span/context as `:parent`
-for a detached parent.
+:parent nil for an explicit root span or pass a span/context as :parent for a
+detached parent. Samplers can drop a span, record it without sampling, or
+record and sample it.
+
+The built-in local sampler configuration supports always_on, always_off,
+traceidratio, parentbased_always_on, parentbased_always_off, and
+parentbased_traceidratio. The ratio sampler validates a value in the closed
+range 0 through 1 and makes a deterministic decision from the trace ID.
+
+## Emit structured logs
+
+Log providers mirror tracer providers: records are detached before processor
+and exporter callbacks, and callback failures are isolated:
+
+~~~lisp
+(let* ((processor
+         (observability-kit:make-log-processor
+          :on-emit (lambda (record)
+                     (declare (ignore record))
+                     t)))
+       (provider
+         (observability-kit:make-log-provider
+          :processors (list processor)
+          :exporter (lambda (record)
+                      (declare (ignore record))
+                      t)))
+       (logger (observability-kit:make-logger provider "orders")))
+  (observability-kit:emit-log
+   logger
+   :severity :info
+   :body "request completed"
+   :attributes '(("route" . "/orders")))
+  (observability-kit:force-flush-log-provider provider)
+  (observability-kit:shutdown-log-provider provider))
+~~~
+
+Use make-log-record and emit-log-record when a record is constructed by
+another integration. The current instrumentation context is attached by
+default; pass :context nil for an explicitly uncorrelated record.
 
 ## Propagate across a boundary
 
 Propagation is an explicit boundary operation. Headers are string-keyed
-alists; unrelated headers are copied and existing W3C fields are replaced.
+alists; unrelated headers are copied and existing fields owned by the selected
+propagator are replaced:
 
-```lisp
+~~~lisp
 (let* ((outgoing
          (observability-kit:inject-trace-context
           (observability-kit:current-instrumentation-context)
           '(("user-agent" . "orders-client"))))
        (incoming (observability-kit:extract-trace-context outgoing)))
   incoming)
-```
+~~~
 
-`traceparent`, `tracestate`, and `baggage` are validated at the trusted
-boundary. Malformed incoming optional fields are ignored while a valid
-`traceparent` is retained; callers should still apply their own trust and
-redaction policy.
+The default configuration is W3C Trace Context plus W3C Baggage. The
+propagation API also provides B3 single-header, B3 multi-header, Jaeger, and
+AWS X-Ray adapters:
+
+~~~lisp
+(let ((b3 (observability-kit:make-b3-propagator)))
+  (observability-kit:propagator-inject
+   b3
+   (observability-kit:current-instrumentation-context)
+   nil))
+~~~
+
+Use make-composite-propagator to try configured propagators in order during
+extraction and to inject through all of them. The adapters do not perform
+I/O. traceparent, tracestate, and baggage are validated at the trusted
+boundary; callers should still apply their own trust and redaction policy.
+
+## Read environment configuration
+
+read-sdk-configuration accepts an explicit environment alist, which makes
+configuration deterministic in tests and in application startup:
+
+~~~lisp
+(let ((configuration
+        (observability-kit:read-sdk-configuration
+         :environment
+         '(("OTEL_SERVICE_NAME" . "orders")
+           ("OTEL_RESOURCE_ATTRIBUTES" . "deployment.environment=prod")
+           ("OTEL_TRACES_SAMPLER" . "traceidratio")
+           ("OTEL_TRACES_SAMPLER_ARG" . "0.25")
+           ("OTEL_PROPAGATORS" . "tracecontext,baggage,b3")))))
+  (observability-kit:sdk-configuration-service-name configuration))
+~~~
+
+The parser covers SDK disabled state, service name, resource attributes,
+propagator selection, metric export interval and timeout, local trace sampler,
+sampler argument, and log level. Supported propagator tokens are
+tracecontext, baggage, b3, b3multi, jaeger, xray, and none. Unsupported or
+conflicting propagator or sampler selections signal configuration-error;
+invalid ratio arguments use the documented default instead of being evaluated
+as code.
+
+Remote sampler clients, exporter selection, batch queues, retries, and
+environment-specific network endpoints remain application or integration
+responsibilities. The configuration object describes those boundaries but
+does not silently create clients or network threads.
 
 ## Convert detached records
 
-Load `cl-observability-kit/otlp` when an application needs OTLP-shaped data:
+Load cl-observability-kit/otlp when an application needs OTLP-shaped data:
 
-```lisp
+~~~lisp
+(observability-kit/otlp:metric-snapshot->otlp metric-snapshot)
 (observability-kit/otlp:span-record->otlp span-record)
 (observability-kit/otlp:log-record->otlp log-record)
 (observability-kit/otlp:traces->otlp span-records)
-```
+~~~
 
 These functions return deterministic Common Lisp alists for an adapter. They
 do not perform serialization, retries, batching, or network I/O.

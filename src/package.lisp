@@ -26,6 +26,9 @@
    #:span-operation-error
    #:logging-error
    #:invalid-log-severity
+   #:log-provider-shutdown
+   #:configuration-error
+   #:configuration-error-name
    #:propagation-error
    #:invalid-traceparent
    #:http-error
@@ -41,6 +44,10 @@
    #:metric
    #:metric-p
    #:counter-p
+   #:up-down-counter-p
+   #:observable-counter-p
+   #:observable-gauge-p
+   #:observable-up-down-counter-p
    #:gauge-p
    #:histogram-p
    #:metric-name
@@ -49,7 +56,14 @@
    #:metric-label-names
    #:metric-kind
    #:metric-registry-metrics
+   #:metric-registry-scope-name
+   #:metric-registry-scope-version
+   #:metric-registry-scope-schema-url
    #:define-counter
+   #:define-up-down-counter
+   #:define-observable-counter
+   #:define-observable-gauge
+   #:define-observable-up-down-counter
    #:define-gauge
    #:define-histogram
    #:metric-inc
@@ -63,6 +77,10 @@
    #:metric-snapshot-unit
    #:metric-snapshot-label-names
    #:metric-snapshot-samples
+   #:metric-snapshot-resource
+   #:metric-snapshot-scope-name
+   #:metric-snapshot-scope-version
+   #:metric-snapshot-scope-schema-url
    #:metric-sample
    #:metric-sample-p
    #:metric-sample-labels
@@ -71,6 +89,51 @@
    #:metric-sample-sum
    #:metric-sample-buckets
    #:+infinity+
+
+   ;; Metric providers and readers
+   #:meter-provider
+   #:meter-provider-p
+   #:make-meter-provider
+   #:meter-provider-resource
+   #:meter-provider-meters
+   #:meter-provider-readers
+   #:meter-provider-shutdown-p
+   #:meter-provider-last-error
+   #:force-flush-meter-provider
+   #:shutdown-meter-provider
+   #:meter
+   #:meter-p
+   #:make-meter
+   #:meter-name
+   #:meter-version
+   #:meter-schema-url
+   #:meter-provider
+   #:meter-registry
+   #:metric-reader
+   #:metric-reader-p
+   #:make-metric-reader
+   #:metric-reader-source
+   #:metric-reader-shutdown-p
+   #:metric-reader-last-error
+   #:metric-reader-last-snapshots
+   #:register-metric-reader
+   #:collect-metric-reader
+   #:force-flush-metric-reader
+   #:metric-reader-force-flush
+   #:shutdown-metric-reader
+   #:metric-reader-shutdown
+   #:periodic-metric-reader
+   #:periodic-metric-reader-p
+   #:make-periodic-metric-reader
+   #:periodic-metric-reader-reader
+   #:periodic-metric-reader-interval
+   #:periodic-metric-reader-running-p
+   #:periodic-metric-reader-shutdown-p
+   #:periodic-metric-reader-last-error
+   #:start-periodic-metric-reader
+   #:collect-periodic-metric-reader
+   #:force-flush-periodic-metric-reader
+   #:shutdown-periodic-metric-reader
 
    ;; Health checks
    #:health-registry
@@ -137,17 +200,43 @@
    #:resource-with-attribute
    #:resource-with-attributes
 
+   ;; SDK configuration
+   #:sdk-configuration
+   #:sdk-configuration-p
+   #:read-sdk-configuration
+   #:sdk-configuration-disabled-p
+   #:sdk-configuration-service-name
+   #:sdk-configuration-resource-attributes
+   #:sdk-configuration-resource
+   #:sdk-configuration-propagator
+   #:sdk-configuration-metric-export-interval
+   #:sdk-configuration-metric-export-timeout
+   #:sdk-configuration-trace-sampler
+   #:sdk-configuration-log-level
+
    ;; Tracing
    #:tracer-provider
    #:tracer-provider-p
    #:make-tracer-provider
+   #:make-trace-id-ratio-sampler
+   #:make-parent-based-sampler
    #:tracer-provider-resource
    #:tracer-provider-clock
    #:tracer-provider-tracers
+   #:tracer-provider-span-processors
    #:tracer-provider-shutdown-p
    #:tracer-provider-last-export-error
    #:force-flush-tracer-provider
    #:shutdown-tracer-provider
+   #:span-processor
+   #:span-processor-p
+   #:make-span-processor
+   #:span-processor-on-start
+   #:span-processor-on-end
+   #:span-processor-force-flush
+   #:span-processor-shutdown
+   #:span-processor-error-handler
+   #:register-span-processor
    #:tracer
    #:tracer-p
    #:make-tracer
@@ -232,6 +321,33 @@
    #:log-record-scope-name
    #:log-record-scope-version
    #:log-record-scope-schema-url
+   #:log-processor
+   #:log-processor-p
+   #:make-log-processor
+   #:log-processor-on-emit
+   #:log-processor-force-flush
+   #:log-processor-shutdown
+   #:log-processor-error-handler
+   #:log-provider
+   #:log-provider-p
+   #:make-log-provider
+   #:log-provider-resource
+   #:log-provider-loggers
+   #:log-provider-processors
+   #:log-provider-shutdown-p
+   #:log-provider-last-error
+   #:force-flush-log-provider
+   #:shutdown-log-provider
+   #:register-log-processor
+   #:logger
+   #:logger-p
+   #:make-logger
+   #:logger-provider
+   #:logger-name
+   #:logger-version
+   #:logger-schema-url
+   #:emit-log
+   #:emit-log-record
 
    ;; W3C propagation
    #:format-traceparent
@@ -240,6 +356,17 @@
    #:parse-baggage
    #:inject-trace-context
    #:extract-trace-context
+   #:propagator
+   #:propagator-p
+   #:make-propagator
+   #:propagator-inject
+   #:propagator-extract
+   #:make-w3c-propagator
+   #:make-composite-propagator
+   #:make-b3-propagator
+   #:make-b3-multi-propagator
+   #:make-jaeger-propagator
+   #:make-xray-propagator
 
    ;; HTTP semantic conventions
    #:http-request-attributes
