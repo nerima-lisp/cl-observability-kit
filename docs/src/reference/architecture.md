@@ -167,8 +167,11 @@ failure affects service admission.
 
 Snapshots and detached span/log records are the stable hand-off format for
 exporters. Prometheus output sorts metric and label data, emits cumulative
-histogram buckets, and escapes label/help/unit text. Structured log records
-carry timestamp and observed timestamp, normalized severity text and number,
+histogram buckets, and escapes label/help/unit text. Metric snapshots retain
+exact Common Lisp numeric values until this exporter boundary; Prometheus
+formatting performs the text conversion there and keeps standard histogram
+boundary representations deterministic. Structured log records carry
+timestamp and observed timestamp, normalized severity text and number,
 body, optional event name, attributes, context, resource, and
 instrumentation-scope metadata. OTLP conversion maps these fields and
 preserves resource and instrumentation-scope metadata in deterministic Common
