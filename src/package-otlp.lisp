@@ -62,6 +62,7 @@
                 #:log-record
                 #:log-record-p
                 #:log-record-timestamp
+                #:log-record-observed-timestamp
                 #:log-record-severity-text
                 #:log-record-severity-number
                 #:log-record-body
@@ -71,6 +72,7 @@
                 #:log-record-scope-name
                 #:log-record-scope-version
                 #:log-record-scope-schema-url
+                #:log-record-event-name
                 #:proper-list-p
                 #:+infinity+)
   (:export #:metric-snapshot->otlp

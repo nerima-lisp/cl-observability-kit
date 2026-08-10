@@ -33,14 +33,18 @@
              (record
                (emit-log logger-a
                          :timestamp 123
+                         :observed-timestamp 124
                          :severity :error
                          :body "request failed"
+                         :event-name "request.failed"
                          :attributes '(("http.status_code" . 500))
                          :context nil)))
         (expect (eq logger-a logger-b) :to-be-truthy)
         (expect (eq processor-record exported-record) :to-be-truthy)
         (expect (log-record-scope-name record) :to-equal "orders")
         (expect (log-record-scope-version record) :to-equal "1")
+        (expect (log-record-observed-timestamp record) :to-equal 124)
+        (expect (log-record-event-name record) :to-equal "request.failed")
         (expect (resource-attribute (log-record-resource record)
                                     "service.name")
                 :to-equal "logs-api")

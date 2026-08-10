@@ -14,18 +14,22 @@
         (setf record
               (make-log-record
                :timestamp 123
+               :observed-timestamp 124
                :severity :warn
                :body body
+               :event-name "request.completed"
                :attributes '(("http.status_code" . 200))
                :resource resource
                :scope-name "request-logger"
                :scope-version "1")))
       (setf (char body 0) #\X)
       (expect (log-record-timestamp record) :to-equal 123)
+      (expect (log-record-observed-timestamp record) :to-equal 124)
       (expect (log-record-severity record) :to-equal :warn)
       (expect (log-record-severity-text record) :to-equal "WARN")
       (expect (log-record-severity-number record) :to-equal 13)
       (expect (log-record-body record) :to-equal "request completed")
+      (expect (log-record-event-name record) :to-equal "request.completed")
       (expect (log-record-attributes record)
               :to-equal '(("http.status_code" . 200)))
       (expect (instrumentation-context-trace-id
@@ -61,6 +65,8 @@
       (make-log-record :timestamp "not-time"))
     (signals logging-error
       (make-log-record :body (list :unsupported)))
+    (signals logging-error
+      (make-log-record :event-name :unsupported))
     (signals logging-error
       (make-log-record :scope-name ""))
     (signals logging-error

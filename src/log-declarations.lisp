@@ -4,11 +4,12 @@
 
 (defstruct (log-record
             (:constructor %make-log-record
-                (timestamp severity severity-text severity-number body
+                (timestamp observed-timestamp severity severity-text severity-number body
                  attributes context resource scope-name scope-version
-                 scope-schema-url))
+                 scope-schema-url event-name))
             (:conc-name %log-record-))
   timestamp
+  observed-timestamp
   severity
   severity-text
   severity-number
@@ -18,7 +19,8 @@
   resource
   scope-name
   scope-version
-  scope-schema-url)
+  scope-schema-url
+  event-name)
 
 (defstruct (log-processor
             (:constructor %make-log-processor

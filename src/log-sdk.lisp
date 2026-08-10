@@ -191,6 +191,7 @@ shutdown failures are isolated and retained as LOG-PROVIDER-LAST-ERROR."
 (defun %copy-log-record (record)
   (make-log-record
    :timestamp (log-record-timestamp record)
+   :observed-timestamp (log-record-observed-timestamp record)
    :severity (log-record-severity record)
    :severity-number (log-record-severity-number record)
    :body (log-record-body record)
@@ -199,7 +200,8 @@ shutdown failures are isolated and retained as LOG-PROVIDER-LAST-ERROR."
    :resource (log-record-resource record)
    :scope-name (log-record-scope-name record)
    :scope-version (log-record-scope-version record)
-   :scope-schema-url (log-record-scope-schema-url record)))
+   :scope-schema-url (log-record-scope-schema-url record)
+   :event-name (log-record-event-name record)))
 
 (defun %record-log-error (provider condition argument &optional processor)
   (let ((provider-handler nil)
@@ -275,11 +277,13 @@ through LOG-PROVIDER-LAST-ERROR and configured error handlers."
   "Create and emit a structured log record in LOGGER's scope.
 
 The accepted options are the record fields that describe one emission:
-TIMESTAMP, SEVERITY, SEVERITY-NUMBER, BODY, ATTRIBUTES, and CONTEXT."
+TIMESTAMP, OBSERVED-TIMESTAMP, SEVERITY, SEVERITY-NUMBER, BODY, ATTRIBUTES,
+CONTEXT, and EVENT-NAME."
   (check-type logger logger)
   (%parse-keyword-options
    option-list
-   '(:timestamp :severity :severity-number :body :attributes :context)
+   '(:timestamp :observed-timestamp :severity :severity-number :body :attributes
+     :context :event-name)
    "EMIT-LOG")
   (let ((provider (%logger-provider logger)))
     (emit-log-record

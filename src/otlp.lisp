@@ -360,12 +360,15 @@ span identifier.  The result is detached and transport-neutral."
 (defun %log-record-document (record)
   (let ((context (log-record-context record)))
     (list (cons "timestamp" (log-record-timestamp record))
+          (cons "observed-timestamp"
+                (log-record-observed-timestamp record))
           (cons "severity-text" (log-record-severity-text record))
           (cons "severity-number" (log-record-severity-number record))
           (cons "body"
                 (observability-kit::%copy-observability-value
                  (log-record-body record)))
           (cons "attributes" (%attributes (log-record-attributes record)))
+          (cons "event-name" (log-record-event-name record))
           (cons "context" (%context-document context))
           (cons "resource" (%resource-document (log-record-resource record)))
           (cons "scope"

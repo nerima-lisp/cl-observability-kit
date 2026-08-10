@@ -320,6 +320,7 @@
    #:log-record-p
    #:make-log-record
    #:log-record-timestamp
+   #:log-record-observed-timestamp
    #:log-record-severity
    #:log-record-severity-text
    #:log-record-severity-number
@@ -330,6 +331,7 @@
    #:log-record-scope-name
    #:log-record-scope-version
    #:log-record-scope-schema-url
+   #:log-record-event-name
    #:log-processor
    #:log-processor-p
    #:make-log-processor

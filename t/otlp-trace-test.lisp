@@ -149,8 +149,10 @@
                      :span-id "span-log"))
            (correlated (make-log-record
                         :timestamp 100
+                        :observed-timestamp 102
                         :severity :info
                         :body "hello"
+                        :event-name "request.completed"
                         :context context
                         :resource resource
                         :scope-name "app"))
@@ -171,6 +173,10 @@
       (expect (length logs) :to-equal 2)
       (expect (string-alist-value "severity-text" (first logs))
               :to-equal "INFO")
+      (expect (string-alist-value "observed-timestamp" (first logs))
+              :to-equal 102)
+      (expect (string-alist-value "event-name" (first logs))
+              :to-equal "request.completed")
       (expect (string-alist-value "trace-id"
                                   (string-alist-value "context" (first logs)))
               :to-equal "trace-log")

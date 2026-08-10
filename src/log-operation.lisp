@@ -31,6 +31,15 @@
                             timestamp)))
   timestamp)
 
+(defun %normalize-log-event-name (event-name)
+  (when event-name
+    (unless (stringp event-name)
+      (error 'logging-error
+             :message (format nil
+                              "Log event name must be a string, got ~S."
+                              event-name))))
+  (%copy-observability-value event-name))
+
 (defun %normalize-log-body (body)
   (unless (or (null body) (stringp body) (numberp body)
               (keywordp body) (symbolp body))
@@ -66,14 +75,19 @@ record, its attributes, context, and resource are detached copies suitable
 for retaining until an exporter or adapter consumes them."
   (let* ((options (%parse-keyword-options
                    option-list
-                   '(:timestamp :severity :severity-number :body :attributes
+                   '(:timestamp :observed-timestamp :severity :severity-number :body :attributes
                      :context :resource :scope-name :scope-version
-                     :scope-schema-url)
+                     :scope-schema-url :event-name)
                    "MAKE-LOG-RECORD"))
+         (now (get-universal-time))
          (timestamp (%validate-log-timestamp
                      (if (%option-supplied-p options :timestamp)
                          (%option-value options :timestamp nil)
-                         (get-universal-time))))
+                         now)))
+         (observed-timestamp (%validate-log-timestamp
+                              (if (%option-supplied-p options :observed-timestamp)
+                                  (%option-value options :observed-timestamp nil)
+                                  now)))
          (severity (%option-value options :severity :info))
          (severity-number-option
            (%validate-log-severity-number
@@ -89,12 +103,15 @@ for retaining until an exporter or adapter consumes them."
                          "LOG scope version"))
          (scope-schema-url (%normalize-log-scope-value
                             (%option-value options :scope-schema-url nil)
-                            "LOG scope schema URL")))
+                            "LOG scope schema URL"))
+         (event-name (%normalize-log-event-name
+                      (%option-value options :event-name nil))))
     (multiple-value-bind (normalized-severity severity-text default-number)
         (%normalize-log-severity severity)
       (check-type resource resource)
       (%make-log-record
        timestamp
+       observed-timestamp
        normalized-severity
        severity-text
        (or severity-number-option default-number)
@@ -104,11 +121,16 @@ for retaining until an exporter or adapter consumes them."
        (make-resource :attributes (resource-attributes resource))
        scope-name
        scope-version
-       scope-schema-url))))
+       scope-schema-url
+       event-name))))
 
 (defun log-record-timestamp (record)
   (check-type record log-record)
   (%log-record-timestamp record))
+
+(defun log-record-observed-timestamp (record)
+  (check-type record log-record)
+  (%log-record-observed-timestamp record))
 
 (defun log-record-severity (record)
   (check-type record log-record)
@@ -150,3 +172,7 @@ for retaining until an exporter or adapter consumes them."
 (defun log-record-scope-schema-url (record)
   (check-type record log-record)
   (%copy-observability-value (%log-record-scope-schema-url record)))
+
+(defun log-record-event-name (record)
+  (check-type record log-record)
+  (%copy-observability-value (%log-record-event-name record)))
