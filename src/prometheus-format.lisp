@@ -102,6 +102,11 @@
                          character)))
       normalized)))
 
+(defun %format-float-number (value)
+  (%normalize-float-number (format nil "~,17G" value)))
+
+(defvar *default-histogram-boundary-strings* nil)
+
 (defun %number-string (value)
   (cond
     ((eq value +infinity+) "+Inf")
@@ -110,12 +115,19 @@
      (or (%terminating-rational-string value)
          ;; Prometheus has no rational literal.  The conversion is confined
          ;; to this text boundary; the core snapshot remains exact.
-         (%normalize-float-number
-          (format nil "~,17G" (coerce value 'double-float)))))
+         (%format-float-number (coerce value 'double-float))))
     ((floatp value)
-     (%normalize-float-number (format nil "~,17G" value)))
+     (or (and *default-histogram-boundary-strings*
+              (gethash value *default-histogram-boundary-strings*))
+         (%format-float-number value)))
     (t
      (%export-error "Metric value ~S is not a supported real number." value))))
+
+(setf *default-histogram-boundary-strings*
+      (let ((cache (make-hash-table :test #'eql)))
+        (dolist (boundary observability-kit::*default-histogram-buckets* cache)
+          (setf (gethash boundary cache)
+                (%format-float-number boundary)))))
 
 (defun %write-number (value stream)
   (cond
