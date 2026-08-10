@@ -101,19 +101,21 @@ find -L result -type f -size +0c -print | rg -m 1 .
 The core source is split by responsibility: metric model, definition,
 operation, snapshot, SDK provider/reader, and periodic reader files; health
 model, registry, thread, and execution files; context, resource, trace,
-sampler, propagation, structured-log, log SDK, configuration, and HTTP
-semantic-convention files. Prometheus source selection, formatting, and
-sample emission are separate files, as are OTLP conversion and the optional
-cl-log-kit bridge.
+trace processors, sampler, propagation, structured-log, log SDK,
+configuration, and HTTP semantic-convention files. Prometheus source
+selection, formatting, and sample emission are separate files, as are OTLP
+conversion and the optional cl-log-kit bridge.
 
 Tests live in t/ and are loaded through the cl-observability-kit/test system.
-Metric SDK and periodic lifecycle contracts live beside trace SDK, log SDK,
-propagation, and configuration contracts. When adding a public lifecycle
-callback, include tests for success, callback failure isolation, repeated
-flush, shutdown, and detached data.
+Metric SDK and periodic lifecycle contracts live beside trace SDK, trace
+processor, log SDK, propagation, and configuration contracts. When adding a
+public lifecycle callback, include tests for success, callback failure
+isolation, repeated flush, shutdown, and detached data. For built-in span
+processors, also cover synchronous export, delayed partial batches, bounded
+queue overflow, exporter errors, and worker shutdown.
 
 When public semantics change, update the API and architecture pages together
 with the README entry point. Keep HTTP clients and servers, wire encoding,
-network exporter lifecycle, logger sinks, batch/retry policy, and
+network exporter lifecycle, logger sinks, network batch/retry policy, and
 provider-specific deployment policy in the application or integration that
 owns them.

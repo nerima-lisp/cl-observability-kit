@@ -202,6 +202,48 @@ traceidratio, parentbased_always_on, parentbased_always_off, and
 parentbased_traceidratio. The ratio sampler validates a value in the closed
 range 0 through 1 and makes a deterministic decision from the trace ID.
 
+### Choose a span processor
+
+Use `make-simple-span-processor` for synchronous export. Its exporter receives
+a proper list containing one sampled, detached span record per call. Use
+`make-batch-span-processor` when export should run on a local worker with a
+bounded queue:
+
+~~~lisp
+(let* ((processor
+         (observability-kit:make-batch-span-processor
+          (lambda (records)
+            ;; Encode or send records in an application integration.
+            (declare (ignore records))
+            t)
+          :schedule-delay 1.0d0
+          :max-queue-size 2048
+          :max-export-batch-size 512))
+       (provider
+         (observability-kit:make-tracer-provider
+          :span-processors (list processor)))
+       (tracer (observability-kit:make-tracer provider "orders")))
+  (observability-kit:with-span (span tracer "GET /orders")
+    (declare (ignore span)))
+  (observability-kit:force-flush-tracer-provider provider)
+  (observability-kit:shutdown-tracer-provider provider))
+~~~
+
+The batch defaults are a five-second schedule delay, a 2048-record queue, and
+512 records per export. Set `:start nil` to start the worker lazily when the
+first sampled record arrives. `force-flush-tracer-provider` drains pending and
+in-flight records; shutdown drains the queue, joins the local worker, and is
+idempotent. Records arriving after `:max-queue-size` is reached are dropped,
+so choose the limit together with the application's loss and backpressure
+policy. `:flush` and `:shutdown` callbacks receive the provider. An
+`:error-handler` receives the error and the failed callback argument (the
+batch for an exporter failure, or `nil` for a worker lifecycle failure).
+
+Install these processors through `:span-processors` and leave the provider's
+legacy direct `:exporter` option unset; configuring both exports a span twice.
+Both built-in processors invoke application callbacks only. Serialization,
+retry policy, and network I/O remain integration responsibilities.
+
 ## Emit structured logs
 
 Log providers mirror tracer providers: records are detached before processor

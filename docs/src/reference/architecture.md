@@ -10,7 +10,7 @@ logger handlers or sinks, wire encoding, or deployment policy.
 
 | System | Owns | Does not own |
 | --- | --- | --- |
-| cl-observability-kit | metric instruments and aggregation, readers, periodic collection, health semantics, cancellation tokens, resources, context, sampler decisions, tracer/provider/span lifecycle, structured logs, processors, W3C and adapter propagation, HTTP semantic conventions, environment parsing | HTTP I/O, logger handlers and sinks, wire encoding, network I/O, exporter queues and retries |
+| cl-observability-kit | metric instruments and aggregation, readers, periodic collection, health semantics, cancellation tokens, resources, context, sampler decisions, tracer/provider/span lifecycle, structured logs, synchronous and bounded batch span processors, W3C and adapter propagation, HTTP semantic conventions, environment parsing | HTTP I/O, logger handlers and sinks, wire encoding, network I/O, network exporter queues and retries |
 | cl-observability-kit/prometheus | deterministic Prometheus text rendering and escaping | an HTTP server or /metrics route |
 | cl-observability-kit/otlp | deterministic OTLP-shaped Common Lisp data | JSON/protobuf encoding, an OTLP client, export retries |
 | cl-observability-kit/log-kit | explicit context-field mapping to cl-log-kit | log records, handlers, sinks, formatting, span lifecycle |
@@ -44,8 +44,11 @@ Metric providers own registries for instrumentation scopes. Pull readers
 collect detached snapshots, and periodic readers run the same collection on a
 worker at a configured interval. Trace processors observe span start/end and
 provider lifecycle. Log processors observe detached log records and provider
-lifecycle. The core provides callback boundaries, not a concrete queue,
-batching policy, serializer, or network client.
+lifecycle. The core provides a callback-only processor plus synchronous and
+bounded batch span processors. The batch worker is local and bounded: it
+preserves completion order, can emit partial batches after a delay, drops new
+records when full, and drains during force-flush or shutdown. It is not a
+serializer or network client.
 
 ## Data and source layout
 
@@ -83,6 +86,9 @@ The source layout keeps the primary data model separate from operations:
 - configuration.lisp parses validated SDK environment settings.
 - log-operation.lisp and log-sdk.lisp create detached structured log records,
   providers, processors, and logger scopes.
+- trace-processors.lisp contains synchronous and bounded batch span processors,
+  including worker lifecycle, queue limits, flush, shutdown, and error
+  isolation.
 - http.lisp validates HTTP semantic-convention attributes and attaches them to
   an existing span; it does not implement an HTTP client or server.
 - prometheus-source.lisp selects and snapshots exporter input.
@@ -165,8 +171,9 @@ histogram buckets, and escapes label/help/unit text. OTLP conversion preserves
 resource and instrumentation-scope metadata in deterministic Common Lisp
 data. Ending a recorded span invokes the configured processor/export
 callbacks; explicit flush and shutdown callbacks provide lifecycle boundaries.
-None of these operations starts an HTTP client/server, opens a connection, or
-starts a network thread.
+The built-in batch processor may start one local worker and keeps its queue
+bounded, but none of these operations starts an HTTP client/server, opens a
+connection, or performs network I/O.
 
 The configuration parser accepts explicit environment alists and validates
 SDK disabled state, service/resource metadata, propagator selection, metric

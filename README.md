@@ -7,14 +7,17 @@ instrumentation context, propagation, and HTTP semantic conventions.
 
 The SDK layer includes synchronous and observable metric instruments, detached
 snapshots, readers, periodic collection, tracer and meter providers, span and
-log processors, samplers, lifecycle callbacks, and a validated environment
-configuration parser. Propagation adapters cover W3C Trace Context and
-Baggage, B3, B3 multi-header, Jaeger, and AWS X-Ray carriers.
+log processors, synchronous and bounded batch span processors, samplers,
+lifecycle callbacks, and a validated environment configuration parser.
+Propagation adapters cover W3C Trace Context and Baggage, B3, B3 multi-header,
+Jaeger, and AWS X-Ray carriers.
 
 The transport boundary is deliberate. Applications and integration packages
-own HTTP clients and servers, logger sinks, wire encoding, batching policy,
-retries, and network exporter I/O. The core never opens a connection or starts
-a network thread.
+own HTTP clients and servers, logger sinks, wire encoding, transport-level
+retry policy, and network exporter I/O. The core also provides optional
+synchronous and in-process bounded batch span processors; those processors
+only hand detached records to application callbacks. The core never opens a
+connection or starts a network client.
 
 ## Quick start
 
@@ -34,7 +37,7 @@ a network thread.
 Metric definitions require symbol names, and labelled updates require the
 complete declared label set. See [Getting started](docs/src/getting-started.md)
 for provider lifecycle, health checks, tracing, logs, propagation, and
-transport adapters.
+transport adapters, including simple and batch span processors.
 
 The optional observability-kit/otlp package converts metric snapshots, span
 records, and log records into detached OTLP-shaped Common Lisp data. It does

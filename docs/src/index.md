@@ -9,7 +9,7 @@ sinks, wire encoders, and network exporters.
 
 | ASDF system | Responsibility |
 | --- | --- |
-| cl-observability-kit | Metrics, health checks, resources, instrumentation context, tracer/meter providers, span/log processors, structured logs, samplers, configuration, propagation adapters, and HTTP semantic conventions. |
+| cl-observability-kit | Metrics, health checks, resources, instrumentation context, tracer/meter providers, generic and built-in span processors, log processors, structured logs, samplers, configuration, propagation adapters, and HTTP semantic conventions. |
 | cl-observability-kit/prometheus | Deterministic Prometheus text exposition. |
 | cl-observability-kit/otlp | Deterministic, transport-neutral OTLP-shaped metric, trace, and log data. It does not encode JSON/protobuf or send anything. |
 | cl-observability-kit/log-kit | Optional bridge from instrumentation context to cl-log-kit's existing log context. |
@@ -23,8 +23,10 @@ validates and attaches semantic-convention attributes to an existing span.
 
 Providers, processors, readers, and exporters use callbacks and detached
 records. They define lifecycle and error boundaries without selecting a
-network protocol. The core does not encode wire formats, start exporter
-clients, implement retries or batching queues, or choose deployment policy.
+network protocol. The core provides synchronous and bounded in-process batch
+span processors, but does not encode wire formats, start exporter clients,
+implement transport retries, or choose deployment policy. A batch processor's
+worker is local; it does not perform network I/O.
 
 ## Start here
 

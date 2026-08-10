@@ -100,6 +100,8 @@ threads do not inherit a caller's dynamic context implicitly.
 | make-tracer-provider &rest option-list | Create a provider with :resource, :clock, :id-generator, :sampler, :exporter, :span-processors, :flush, :shutdown, and :export-error-handler. |
 | make-tracer provider name &rest option-list | Create an instrumentation scope with optional :version and :schema-url. |
 | make-span-processor &rest option-list | Create lifecycle callbacks :on-start, :on-end, :force-flush, :shutdown, and :error-handler. |
+| make-simple-span-processor exporter &rest option-list | Create a synchronous processor. The exporter receives one sampled, detached span record in a proper list; optional callbacks are :flush, :shutdown, and :error-handler. |
+| make-batch-span-processor exporter &rest option-list | Create an asynchronous bounded processor. Options include :schedule-delay, :max-queue-size, :max-export-batch-size, :start, :flush, :shutdown, and :error-handler. |
 | register-span-processor provider processor | Attach a processor to an existing provider. |
 | start-span tracer name &rest option-list | Start a span with :parent, :kind, :attributes, and :start-time. :parent defaults to the current span. |
 | end-span span &rest option-list | End a span with :end-time, :status, and :status-message. |
@@ -114,6 +116,16 @@ and immutable span-context. The custom sampler callback keeps its four
 argument contract: parent context, operation name, span kind, and attributes.
 The built-in ratio sampler also uses the candidate trace ID for deterministic
 decisions.
+
+Built-in processors export sampled records only. The simple processor invokes
+its exporter synchronously. The batch processor preserves completion order,
+exports partial batches after its schedule delay, drops new records when its
+bounded queue is full, and drains pending records during force-flush or
+shutdown; shutdown also joins its local worker. Set :start to nil for lazy
+startup. Install these processors through :span-processors and leave the
+provider's direct :exporter unset to avoid duplicate export. Processor
+callbacks receive detached proper lists and do not encode or send a wire
+format.
 
 ## Structured logs
 
