@@ -39,6 +39,10 @@ complete declared label set. See [Getting started](docs/src/getting-started.md)
 for provider lifecycle, health checks, tracing, logs, propagation, and
 transport adapters, including simple and batch span processors.
 
+Structured log records carry `timestamp`, `observed-timestamp`, normalized
+severity text and number, body, an optional event name, attributes,
+instrumentation context, resource metadata, and logger scope metadata.
+
 The optional observability-kit/otlp package converts metric snapshots, span
 records, and log records into detached OTLP-shaped Common Lisp data. It does
 not serialize or send a wire payload.

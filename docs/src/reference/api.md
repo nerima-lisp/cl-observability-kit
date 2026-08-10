@@ -131,13 +131,21 @@ format.
 
 | Operation | Purpose |
 | --- | --- |
-| make-log-record &rest option-list | Create a detached record with timestamp, severity, body, attributes, context, resource, and instrumentation-scope metadata. |
+| make-log-record &rest option-list | Create a detached record with `timestamp`, `observed-timestamp`, normalized severity text and number, body, optional event name, attributes, context, resource, and instrumentation-scope metadata. |
 | make-log-processor &rest option-list | Create :on-emit, :force-flush, :shutdown, and :error-handler callbacks. |
 | make-log-provider &rest option-list | Create a provider with :resource, :processors, :exporter, :flush, :shutdown, and :error-handler. |
 | make-logger provider name &rest option-list | Create or return a logger scope with optional :version and :schema-url. |
-| emit-log logger &rest option-list | Create and emit a record with timestamp, severity, body, attributes, and context fields. |
+| emit-log logger &rest option-list | Create and emit a record with timestamp, observed timestamp, severity, optional severity number, body, attributes, context, and event name fields. |
 | emit-log-record logger record | Emit an existing record through processors and the provider exporter. |
 | force-flush-log-provider, shutdown-log-provider | Invoke processor and provider lifecycle callbacks. |
+
+The standard severity names are `TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`, and
+`FATAL`; their default severity numbers are 1, 5, 9, 13, 17, and 21. An
+explicit `:severity-number` must be an integer from 1 through 24. Both
+`:timestamp` and `:observed-timestamp` default to record construction time,
+and `:event-name`, when supplied, must be a string. The public record
+accessors expose these fields along with body, attributes, context, resource,
+and instrumentation-scope metadata.
 
 The current instrumentation context is attached by default; pass :context
 nil for an explicitly uncorrelated record. Processors and exporters receive

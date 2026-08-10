@@ -167,9 +167,12 @@ failure affects service admission.
 
 Snapshots and detached span/log records are the stable hand-off format for
 exporters. Prometheus output sorts metric and label data, emits cumulative
-histogram buckets, and escapes label/help/unit text. OTLP conversion preserves
-resource and instrumentation-scope metadata in deterministic Common Lisp
-data. Ending a recorded span invokes the configured processor/export
+histogram buckets, and escapes label/help/unit text. Structured log records
+carry timestamp and observed timestamp, normalized severity text and number,
+body, optional event name, attributes, context, resource, and
+instrumentation-scope metadata. OTLP conversion maps these fields and
+preserves resource and instrumentation-scope metadata in deterministic Common
+Lisp data. Ending a recorded span invokes the configured processor/export
 callbacks; explicit flush and shutdown callbacks provide lifecycle boundaries.
 The built-in batch processor may start one local worker and keeps its queue
 bounded, but none of these operations starts an HTTP client/server, opens a

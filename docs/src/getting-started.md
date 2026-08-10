@@ -273,7 +273,12 @@ and exporter callbacks, and callback failures are isolated:
 
 Use make-log-record and emit-log-record when a record is constructed by
 another integration. The current instrumentation context is attached by
-default; pass :context nil for an explicitly uncorrelated record.
+default; pass :context nil for an explicitly uncorrelated record. Each record
+has a `timestamp` and an `observed-timestamp`, both defaulting to construction
+time, plus normalized severity text and number. The standard severities are
+`TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`, and `FATAL`; pass
+`:severity-number` to provide an integer from 1 through 24, and pass
+`:event-name` when the integration has a stable event name.
 
 ## Propagate across a boundary
 
