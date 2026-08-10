@@ -118,6 +118,8 @@
            (span (start-span tracer "dropped" :parent nil)))
       (expect (not (span-recording-p span)) :to-be-truthy)
       (expect (not (span-sampled-p span)) :to-be-truthy)
+      (expect (span-update-name span "ignored") :to-equal span)
+      (expect (span-name span) :to-equal "dropped")
       (span-set-attribute span "dropped.attribute" "value")
       (span-add-event span "dropped.event")
       (span-add-link span (make-instrumentation-context :trace-id "trace"))
@@ -135,6 +137,19 @@
       (end-span span)
       (expect (length records) :to-equal 1)
       (expect (tracer-provider-last-export-error provider) :to-be-truthy))))
+
+  (it "updates recording span names and rejects post-end mutation"
+    (let* ((records nil)
+           (provider (make-tracer-provider
+                      :exporter (lambda (record) (push record records))))
+           (tracer (make-tracer provider "rename"))
+           (span (start-span tracer "before" :parent nil)))
+      (expect (span-update-name span "after") :to-equal span)
+      (expect (span-name span) :to-equal "after")
+      (end-span span)
+      (expect (span-record-name (first records)) :to-equal "after")
+      (signals span-operation-error
+        (span-update-name span "too-late"))))
 
   (it "records exceptions in with-span cleanup"
     (let* ((records nil)

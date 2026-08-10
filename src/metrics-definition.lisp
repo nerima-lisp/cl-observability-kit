@@ -130,7 +130,8 @@
                           nil
                           (cl-concurrent-kit:make-lock :name normalized-name)
                           normalized-buckets
-                          normalized-callback)))
+                          normalized-callback
+                          (get-universal-time))))
              (when (and (null normalized-label-names)
                         (not (%observable-metric-kind-p kind)))
                (let ((series (%empty-series kind normalized-buckets nil)))

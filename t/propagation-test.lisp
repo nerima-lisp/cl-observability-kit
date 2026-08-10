@@ -33,6 +33,7 @@
       (expect (instrumentation-context-span-id extracted)
               :to-equal "bbbbbbbbbbbbbbbb")
       (expect (instrumentation-context-trace-flags extracted) :to-equal 1)
+      (expect (instrumentation-context-remote-p extracted) :to-be-truthy)
       (expect (instrumentation-context-tracestate extracted)
               :to-equal "vendor=value")
       (expect (instrumentation-context-baggage extracted)

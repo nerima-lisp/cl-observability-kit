@@ -309,5 +309,6 @@ valid traceparent context."
              :span-id (instrumentation-context-span-id context)
              :trace-flags (instrumentation-context-trace-flags context)
              :baggage baggage
-             :tracestate tracestate))
+             :tracestate tracestate
+             :remote-p t))
         (propagation-error () nil)))))

@@ -81,6 +81,9 @@
    #:metric-snapshot-scope-name
    #:metric-snapshot-scope-version
    #:metric-snapshot-scope-schema-url
+   #:metric-snapshot-temporality
+   #:metric-snapshot-timestamp
+   #:metric-snapshot-start-time
    #:metric-sample
    #:metric-sample-p
    #:metric-sample-labels
@@ -88,6 +91,8 @@
    #:metric-sample-count
    #:metric-sample-sum
    #:metric-sample-buckets
+   #:metric-sample-timestamp
+   #:metric-sample-start-time
    #:+infinity+
 
    ;; Metric providers and readers
@@ -182,6 +187,7 @@
    #:instrumentation-context-attributes
    #:instrumentation-context-baggage
    #:instrumentation-context-tracestate
+   #:instrumentation-context-remote-p
    #:context-attribute
    #:context-with-attribute
    #:context-with-attributes
@@ -248,6 +254,7 @@
    #:start-span
    #:end-span
    #:span-name
+   #:span-update-name
    #:span-kind
    #:span-trace-id
    #:span-id

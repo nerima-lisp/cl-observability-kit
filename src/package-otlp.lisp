@@ -58,6 +58,7 @@
                 #:instrumentation-context-trace-id
                 #:instrumentation-context-span-id
                 #:instrumentation-context-trace-flags
+                #:instrumentation-context-remote-p
                 #:log-record
                 #:log-record-p
                 #:log-record-timestamp

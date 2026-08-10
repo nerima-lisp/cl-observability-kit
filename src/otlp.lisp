@@ -45,7 +45,7 @@
                          (cdr pair)))))
           labels))
 
-(defun %data-point (sample &key value count sum)
+(defun %data-point (sample &key value count sum timestamp start-time)
   (let ((data-point
           (list (cons "attributes"
                       (%attributes
@@ -56,6 +56,10 @@
       (push (cons "count" count) data-point))
     (when (not (null sum))
       (push (cons "sum" sum) data-point))
+    (when (not (null timestamp))
+      (push (cons "timestamp" timestamp) data-point))
+    (when (not (null start-time))
+      (push (cons "start-time" start-time) data-point))
     (nreverse data-point)))
 
 (defun %histogram-components (buckets)
@@ -86,6 +90,14 @@
       (push (cons "sum"
                   (observability-kit::%metric-sample-sum sample))
             data-point)
+      (let ((timestamp
+              (observability-kit::%metric-sample-timestamp sample))
+            (start-time
+              (observability-kit::%metric-sample-start-time sample)))
+        (when (not (null timestamp))
+          (push (cons "timestamp" timestamp) data-point))
+        (when (not (null start-time))
+          (push (cons "start-time" start-time) data-point)))
       (push (cons "explicit-bounds" bounds) data-point)
       (push (cons "bucket-counts" counts) data-point)
       (nreverse data-point))))
@@ -94,25 +106,34 @@
   (let ((type (observability-kit::%metric-snapshot-type snapshot))
         (samples (observability-kit::%metric-snapshot-samples snapshot)))
     (case type
-      (:counter
+      ((:counter :up-down-counter :observable-counter
+        :observable-up-down-counter)
        (list (cons "type" "sum")
              (cons "aggregation-temporality" "cumulative")
-             (cons "is-monotonic" t)
+             (cons "is-monotonic"
+                   (not (null (member type '(:counter :observable-counter)
+                                      :test #'eq))))
              (cons "data-points"
                    (mapcar (lambda (sample)
                              (%data-point
                               sample
                               :value
-                              (observability-kit::%metric-sample-value sample)))
+                              (observability-kit::%metric-sample-value sample)
+                              :timestamp
+                              (observability-kit::%metric-sample-timestamp sample)
+                              :start-time
+                              (observability-kit::%metric-sample-start-time sample)))
                            samples))))
-      (:gauge
+      ((:gauge :observable-gauge)
        (list (cons "type" "gauge")
              (cons "data-points"
                    (mapcar (lambda (sample)
                              (%data-point
                               sample
                               :value
-                              (observability-kit::%metric-sample-value sample)))
+                              (observability-kit::%metric-sample-value sample)
+                              :timestamp
+                              (observability-kit::%metric-sample-timestamp sample)))
                            samples))))
       (:histogram
        (list (cons "type" "histogram")
@@ -128,8 +149,11 @@
 The returned Common Lisp numbers are the exact values from SNAPSHOT.  This
 function deliberately does not serialize JSON or coerce rationals to
 double-floats; a transport adapter can choose the wire representation at its
-boundary.  HISTOGRAM bucket counts are converted from the cumulative counts
-used by the core snapshot to OTLP's per-bucket counts."
+boundary.  Metric timestamps retain the exact source values under the
+transport-neutral TIMESTAMP and START-TIME keys; a wire adapter is responsible
+for converting them to OTLP time_unix_nano fields.  HISTOGRAM bucket counts are
+converted from the cumulative counts used by the core snapshot to OTLP's
+per-bucket counts."
   (check-type snapshot metric-snapshot)
   (append
    (list (cons "name"
@@ -216,6 +240,8 @@ different resources must be exported as separate documents."
                  (instrumentation-context-span-id context)))
           (cons "trace-flags"
                 (instrumentation-context-trace-flags context))
+          (cons "remote"
+                (instrumentation-context-remote-p context))
           (cons "attributes" (%attributes (span-link-attributes link))))))
 
 (defun %span-record-document (record)

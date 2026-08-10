@@ -23,7 +23,8 @@
 (defstruct (metric
             (:constructor %make-metric
                 (kind registry name help unit label-names cardinality-limit
-                 series series-order lock histogram-buckets callback))
+                 series series-order lock histogram-buckets callback
+                 &optional start-time))
             (:conc-name %metric-))
   kind
   registry
@@ -36,7 +37,8 @@
   series-order
   lock
   histogram-buckets
-  callback)
+  callback
+  start-time)
 
 (defstruct (metric-series
             (:constructor %make-metric-series (labels value count sum bucket-counts))
@@ -58,17 +60,22 @@
   resource
   scope-name
   scope-version
-  scope-schema-url)
+  scope-schema-url
+  temporality
+  timestamp
+  start-time)
 
 (defstruct (metric-sample
             (:constructor %make-metric-sample
-                (labels value count sum buckets))
+                (labels value count sum buckets &optional timestamp start-time))
             (:conc-name %metric-sample-))
   labels
   value
   count
   sum
-  buckets)
+  buckets
+  timestamp
+  start-time)
 
 (defstruct (meter-provider
             (:constructor %make-meter-provider

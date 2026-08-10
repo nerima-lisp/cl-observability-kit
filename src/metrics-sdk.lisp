@@ -49,7 +49,10 @@
    :scope-version (%copy-observability-value
                    (%metric-snapshot-scope-version snapshot))
    :scope-schema-url (%copy-observability-value
-                      (%metric-snapshot-scope-schema-url snapshot))))
+                      (%metric-snapshot-scope-schema-url snapshot))
+   :temporality (%metric-snapshot-temporality snapshot)
+   :timestamp (%metric-snapshot-timestamp snapshot)
+   :start-time (%metric-snapshot-start-time snapshot)))
 
 (defun %metric-source-snapshots (source)
   (let ((snapshots (metric-snapshot source)))

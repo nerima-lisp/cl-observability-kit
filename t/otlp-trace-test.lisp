@@ -32,6 +32,14 @@
                            :attributes '(("cache.hit" . t)))
            (span-add-link child (span-context root)
                           :attributes '(("link.reason" . "derived")))
+           (span-add-link
+            child
+            (make-instrumentation-context
+             :trace-id "dddddddddddddddddddddddddddddddd"
+             :span-id "eeeeeeeeeeeeeeee"
+             :trace-flags 1
+             :remote-p t)
+            :attributes '(("link.reason" . "remote")))
            (span-set-status child :ok)
            (end-span child :end-time 13))))
       (end-span root :end-time 15 :status :ok)
@@ -73,7 +81,14 @@
         (expect (length (string-alist-value "events" child-document))
                 :to-equal 1)
         (expect (length (string-alist-value "links" child-document))
-                :to-equal 1)
+                :to-equal 2)
+        (let ((remote-link
+                (find t (string-alist-value "links" child-document)
+                      :key (lambda (link)
+                             (string-alist-value "remote" link)))))
+          (expect remote-link :to-be-truthy)
+          (expect (string-alist-value "trace-id" remote-link)
+                  :to-equal "dddddddddddddddddddddddddddddddd"))
         (expect (string-alist-value "end-time" root-document) :to-equal 15)
         (setf (cdr (assoc "name" child-document :test #'string=)) "changed")
         (expect (span-record-name (second records)) :to-equal "query")

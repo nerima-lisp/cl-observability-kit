@@ -341,6 +341,18 @@ not retain data or invoke the exporter."
     (error 'span-operation-error :span span :operation operation
            :message (format nil "Cannot ~A an ended span." operation))))
 
+(defun span-update-name (span name)
+  "Update SPAN's name while it is open and return SPAN.
+
+Non-recording spans accept the operation as a no-op after validation."
+  (check-type span span)
+  (let ((normalized (%normalize-span-name name)))
+    (cl-concurrent-kit:with-lock-held ((%span-lock span))
+      (%ensure-span-open span "update its name")
+      (when (%span-recording-p span)
+        (setf (%span-name span) normalized))))
+  span)
+
 (defun %set-span-attribute (span name value &key allow-sensitive-names)
   (check-type span span)
   (let* ((normalized (%validate-attribute-name
@@ -524,7 +536,7 @@ Non-recording spans accept the operation as a no-op after validation."
         (error () nil)))))
 
 (defun end-span (span &rest option-list)
-  "End SPAN once and invoke its provider exporter when it was recorded.
+  "End SPAN once and invoke its provider exporter when it was sampled.
 
 Repeated END-SPAN calls are idempotent.  Exporter failures do not escape the
 instrumented operation; inspect TRACER-PROVIDER-LAST-EXPORT-ERROR or supply
@@ -567,7 +579,7 @@ an EXPORT-ERROR-HANDLER to observe them."
       (setf processors (tracer-provider-span-processors provider))
       (dolist (processor processors)
         (%call-span-processor provider processor :on-end record)))
-    (when (and record exporter)
+    (when (and record exporter (span-record-sampled-p record))
       (handler-case
           (funcall exporter record)
         (error (condition)
