@@ -46,6 +46,10 @@
          "00-00000000000000000000000000000000-bbbbbbbbbbbbbbbb-01"))
       (expect (extract-trace-context '(("traceparent" . "not-a-traceparent")))
               :to-equal nil)
+      (expect (extract-trace-context '("not-a-header-pair"))
+              :to-equal nil)
+      (expect (extract-trace-context '(("traceparent" . 42)))
+              :to-equal nil)
       (let ((context
               (extract-trace-context
                `(("traceparent" . ,valid)
@@ -171,6 +175,10 @@
       (signals propagation-error (parse-baggage "k=%F0%41%98%80"))
       (signals propagation-error (parse-baggage "k=%F0%9F%41%80"))
       (signals propagation-error (parse-baggage "k=%F0%9F%98%41"))
+      (signals propagation-error (parse-baggage "k=%E0%80%80"))
+      (signals propagation-error (parse-baggage "k=%ED%A0%80"))
+      (signals propagation-error (parse-baggage "k=%F0%80%80%80"))
+      (signals propagation-error (parse-baggage "k=%F4%90%80%80"))
       (signals propagation-error (parse-baggage "k=%FF"))
       (expect (parse-baggage "") :to-equal nil)
       (expect (inject-trace-context nil '(("x" "y")))

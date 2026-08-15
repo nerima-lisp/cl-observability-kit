@@ -1,6 +1,6 @@
-#.(progn (in-package #:observability-kit) nil)
-
-;;; Public provider and processor readers.
+#.(progn
+    (in-package #:observability-kit)
+    nil)
 
 (defun tracer-provider-resource (provider)
   (check-type provider tracer-provider)

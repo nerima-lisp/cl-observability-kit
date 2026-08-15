@@ -2,28 +2,33 @@
     (in-package #:observability-kit)
     nil)
 
-(defun %static-metric-name (name)
-  "Return the source-level metric name required by DEFINE-* macros.
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun %static-metric-name (name)
+    "Return the source-level metric name required by DEFINE-* macros.
 
-Metric names are intentionally compile-time symbols.  This keeps definitions
-readable and removes the old runtime string/designator surface."
-  (unless (and (symbolp name) (not (keywordp name)))
-    (error 'program-error))
-  (string-downcase (symbol-name name)))
-
-(defun %validate-metric-definition-options (options)
-  (let ((accepted '(:help :unit :label-names :cardinality-limit :buckets
-                    :callback))
-        (seen '()))
-    (unless (evenp (length options))
+    Metric names are intentionally compile-time symbols.  This keeps definitions
+    readable and removes the old runtime string/designator compatibility surface."
+    (unless (and (symbolp name) (not (keywordp name)))
       (error 'program-error))
-    (loop for key in options by #'cddr
-          do (unless (and (keywordp key) (member key accepted :test #'eq))
-               (error 'program-error))
-             (when (member key seen :test #'eq)
-               (error 'program-error))
-             (push key seen)))
-  options)
+    (string-downcase (symbol-name name)))
+
+  (defun %validate-metric-definition-options (options)
+    (let ((accepted '(:help :unit :label-names :cardinality-limit :buckets
+                      :callback))
+          (seen '()))
+      (unless (evenp (length options))
+        (error 'program-error))
+      (loop for key in options by #'cddr
+            do (unless (and (keywordp key) (member key accepted :test #'eq))
+                 (error 'program-error))
+               (when (member key seen :test #'eq)
+                 (error 'program-error))
+               (push key seen)))
+    options)
+
+  (defun %expand-metric-declaration (registry kind name options)
+    (%validate-metric-definition-options options)
+    `(%define-metric ,registry ,kind ,(%static-metric-name name) ,@options)))
 
 (defmacro %with-metric-series ((series metric labels) &body body)
   "Run BODY with the locked metric series for LABELS.
@@ -62,39 +67,28 @@ series cannot race another operation for the same metric."
 
 (defmacro define-counter (registry name &rest options)
   "Define a counter named by the symbol NAME in REGISTRY."
-  (%validate-metric-definition-options options)
-  `(%define-metric ,registry :counter ,(%static-metric-name name) ,@options))
+  (%expand-metric-declaration registry :counter name options))
 
 (defmacro define-up-down-counter (registry name &rest options)
   "Define a counter that may be incremented or decremented."
-  (%validate-metric-definition-options options)
-  `(%define-metric ,registry :up-down-counter ,(%static-metric-name name)
-                   ,@options))
+  (%expand-metric-declaration registry :up-down-counter name options))
 
 (defmacro define-gauge (registry name &rest options)
   "Define a gauge named by the symbol NAME in REGISTRY."
-  (%validate-metric-definition-options options)
-  `(%define-metric ,registry :gauge ,(%static-metric-name name) ,@options))
+  (%expand-metric-declaration registry :gauge name options))
 
 (defmacro define-histogram (registry name &rest options)
   "Define a histogram named by the symbol NAME in REGISTRY."
-  (%validate-metric-definition-options options)
-  `(%define-metric ,registry :histogram ,(%static-metric-name name) ,@options))
+  (%expand-metric-declaration registry :histogram name options))
 
 (defmacro define-observable-counter (registry name &rest options)
   "Define a callback-driven observable counter."
-  (%validate-metric-definition-options options)
-  `(%define-metric ,registry :observable-counter ,(%static-metric-name name)
-                   ,@options))
+  (%expand-metric-declaration registry :observable-counter name options))
 
 (defmacro define-observable-gauge (registry name &rest options)
   "Define a callback-driven observable gauge."
-  (%validate-metric-definition-options options)
-  `(%define-metric ,registry :observable-gauge ,(%static-metric-name name)
-                   ,@options))
+  (%expand-metric-declaration registry :observable-gauge name options))
 
 (defmacro define-observable-up-down-counter (registry name &rest options)
   "Define a callback-driven observable up-down counter."
-  (%validate-metric-definition-options options)
-  `(%define-metric ,registry :observable-up-down-counter
-                   ,(%static-metric-name name) ,@options))
+  (%expand-metric-declaration registry :observable-up-down-counter name options))

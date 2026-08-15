@@ -1,5 +1,5 @@
-(defparameter *test-timeout-seconds* 120
-  "Maximum runtime for the direct test command, in seconds.")
+#+sbcl
+(require :sb-cover)
 
 (require "asdf")
 
@@ -8,26 +8,29 @@
    (or *load-truename* *default-pathname-defaults*)))
 
 (load (merge-pathnames "scripts/bootstrap.lisp" *script-directory*))
-(observability-kit.bootstrap:initialize-source-registry)
+(defparameter *project-root* (observability-kit.bootstrap:project-root))
+(observability-kit.bootstrap:initialize-source-registry
+ :root *project-root*
+ :ignore-inherited-configuration t)
+(format t "~&Loading cl-weave...~%")
+(finish-output)
 (asdf:load-system "cl-weave")
+(format t "~&Loading test plan...~%")
+(finish-output)
 (load (merge-pathnames "scripts/test-plan.lisp" *script-directory*))
 
 (let ((success
         (handler-case
-            #+sbcl
-            (sb-ext:with-timeout *test-timeout-seconds*
-              (let ((root (observability-kit.bootstrap:initialize-source-registry)))
-                (declare (ignore root))
-                (asdf:load-system "cl-observability-kit/test")
-                (observability-kit.test-plan:assert-runnable-test-plan)
-                (cl-weave:run-all
-                 :reporter :spec
-                 :pass-with-no-tests nil)))
-            #-sbcl
             (progn
+              (format t "~&Loading cl-observability-kit/test...~%")
+              (finish-output)
               (asdf:load-system "cl-observability-kit/test")
               (observability-kit.test-plan:assert-runnable-test-plan)
-              (cl-weave:run-all :reporter :spec :pass-with-no-tests nil))
+              (format t "~&Running test plan...~%")
+              (finish-output)
+              (cl-weave:run-all
+               :reporter :spec
+               :pass-with-no-tests nil))
           (error (condition)
             (format *error-output* "~&Test runner failed (~S): ~A~%"
                     (type-of condition)

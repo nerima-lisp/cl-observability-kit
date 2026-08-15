@@ -37,28 +37,24 @@
                (:file "resource-declarations")
                (:file "resource")
                (:file "metrics-sdk")
-               (:file "metrics-provider")
                (:file "metrics-periodic")
                (:file "trace-declarations")
                (:file "trace-model")
-               (:file "trace-provider-readers")
+               (:file "trace-provider")
                (:file "trace-operation")
-               (:file "trace-span-operations")
-               (:file "trace-state-readers")
-               (:file "trace-record-readers")
-               (:file "trace-provider-lifecycle")
+               (:file "trace-span-data")
+               (:file "trace-span-lifecycle")
+               (:file "trace-records")
                (:file "trace-processors")
                (:file "trace-macros")
                (:file "propagation")
                (:file "propagator")
-               (:file "propagation-carriers")
-               (:file "configuration-model")
+               (:file "propagation-adapters")
                (:file "configuration")
                (:file "http")
                (:file "log-declarations")
                (:file "log-operation")
-               (:file "log-sdk")
-               (:file "log-readers"))
+               (:file "log-sdk"))
   :in-order-to ((asdf:test-op (asdf:test-op "cl-observability-kit/test"))))
 
 (asdf:defsystem "cl-observability-kit/prometheus"
@@ -72,12 +68,11 @@
   :components ((:file "package-prometheus")
                (:file "prometheus-source")
                (:file "prometheus-format")
-               (:file "prometheus-data")
                (:file "prometheus-samples")
                (:file "prometheus")))
 
 (asdf:defsystem "cl-observability-kit/otlp"
-  :description "A transport-neutral OTLP-shaped document carrier."
+  :description "A transport-neutral OTLP-shaped document adapter."
   :author "Project contributors"
   :license "MIT"
   :version "0.1.0"
@@ -85,9 +80,10 @@
   :pathname "src"
   :serial t
   :components ((:file "package-otlp")
-               (:file "otlp-common")
+               (:file "otlp")
                (:file "otlp-metrics")
-               (:file "otlp")))
+               (:file "otlp-traces")
+               (:file "otlp-logs")))
 
 (asdf:defsystem "cl-observability-kit/log-kit"
   :description "Optional instrumentation-context bridge for cl-log-kit."
@@ -103,7 +99,7 @@
                (:file "log-kit")))
 
 (asdf:defsystem "cl-observability-kit/test"
-  :description "Tests for cl-observability-kit and its optional carriers."
+  :description "Tests for cl-observability-kit and its optional adapters."
   :author "Project contributors"
   :license "MIT"
   :depends-on ("cl-observability-kit/prometheus"

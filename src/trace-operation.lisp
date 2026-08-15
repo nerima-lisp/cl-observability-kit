@@ -107,14 +107,8 @@
             (%record-span-processor-error provider processor condition argument)
             nil)))))
 
-(defun %start-span-under-lock
-    (provider tracer span-name kind attributes parent-context options)
-  "Create a span while PROVIDER's lock is held.
-
-Return the span, whether it records data, and the processor snapshot.  Keeping
-the sampler decision and mutable provider reads in this locked helper leaves
-START-SPAN responsible only for boundary normalization and continuation of
-the lifecycle callbacks."
+(defun %start-span-under-lock (provider tracer span-name kind attributes
+                                parent-context options)
   (let* ((id-generator (%tracer-provider-id-generator provider))
          (trace-id (%trace-id-for-parent parent-context id-generator))
          (decision (%sampler-decision
@@ -129,35 +123,35 @@ the lifecycle callbacks."
                                      "Span start time")
                (cl-boundary-kit:clock-now (%tracer-provider-clock provider))))
          (start-monotonic
-           (cl-boundary-kit:clock-monotonic (%tracer-provider-clock provider)))
-         (processors (copy-list (%tracer-provider-span-processors provider)))
-         (span
-           (%make-span
-            (cl-concurrent-kit:make-lock :name "observability-span")
-            provider
-            tracer
-            span-name
-            kind
-            trace-id
-            span-id
-            (%context-span-id parent-context)
-            (%span-flags parent-context sampled-p)
-            (%context-attributes parent-context)
-            (%context-baggage parent-context)
-            (%context-tracestate parent-context)
-            start-time
-            start-monotonic
-            nil
-            nil
-            :unset
-            nil
-            attributes
-            nil
-            nil
-            recording-p
-            sampled-p
-            nil)))
-    (values span recording-p processors)))
+           (cl-boundary-kit:clock-monotonic (%tracer-provider-clock provider))))
+    (values
+     (%make-span
+      (cl-concurrent-kit:make-lock :name "observability-span")
+      provider
+      tracer
+      span-name
+      kind
+      trace-id
+      span-id
+      (%context-span-id parent-context)
+      (%span-flags parent-context sampled-p)
+      (%context-attributes parent-context)
+      (%context-baggage parent-context)
+      (%context-tracestate parent-context)
+      start-time
+      start-monotonic
+      nil
+      nil
+      :unset
+      nil
+      attributes
+      nil
+      nil
+      recording-p
+      sampled-p
+      nil)
+     recording-p
+     (copy-list (%tracer-provider-span-processors provider)))))
 
 (defun start-span (tracer name &rest option-list)
   "Start a span and return it.
@@ -175,105 +169,14 @@ not retain data or invoke the exporter."
          (span-name (%normalize-span-name name))
          (kind (%normalize-span-kind (%option-value options :kind :internal)))
          (attributes (%normalize-attributes (%option-value options :attributes nil)))
-         (provider (%tracer-provider tracer))
-         (span nil)
-         (recording-p nil)
-         (processors nil))
-    (cl-concurrent-kit:with-lock-held ((%tracer-provider-lock provider))
-      (when (%tracer-provider-shutdown-p provider)
-        (error 'tracer-provider-shutdown :provider provider))
-      (multiple-value-setq (span recording-p processors)
-        (%start-span-under-lock provider tracer span-name kind attributes
-                                parent-context options)))
-    (when recording-p
-      (dolist (processor processors)
-        (%call-span-processor provider processor :on-start span)))
-    span))
-
-(defun %make-span-record-from-span (span end-time end-monotonic status message)
-  (let* ((provider (%span-provider span))
-         (tracer (%span-tracer span))
-         (duration (/ (- end-monotonic (%span-start-monotonic span))
-                      (%tracer-provider-monotonic-units-per-second provider))))
-    (%make-span-record
-     (%span-trace-id span)
-     (%span-span-id span)
-     (%span-parent-span-id span)
-     (%span-name span)
-     (%span-kind span)
-     (%span-start-time span)
-     end-time
-     (max 0 duration)
-     status
-     message
-     (%span-trace-flags span)
-     (%span-sampled-p span)
-     (%span-recording-p span)
-     (%copy-alist (%span-attributes span))
-     (mapcar #'%copy-span-event (reverse (%span-events span)))
-     (mapcar #'%copy-span-link (reverse (%span-links span)))
-     (tracer-provider-resource provider)
-     (tracer-name tracer)
-     (tracer-version tracer)
-     (tracer-schema-url tracer))))
-
-(defun %record-export-error (provider condition record)
-  (let ((handler nil))
-    (cl-concurrent-kit:with-lock-held ((%tracer-provider-lock provider))
-      (setf (%tracer-provider-last-export-error provider) condition
-            handler (%tracer-provider-export-error-handler provider)))
-    (when handler
-      (handler-case
-          (funcall handler condition record)
-        (error () nil)))))
-
-(defun end-span (span &rest option-list)
-  "End SPAN once and invoke its provider exporter when it was sampled.
-
-Repeated END-SPAN calls are idempotent.  Exporter failures do not escape the
-instrumented operation; inspect TRACER-PROVIDER-LAST-EXPORT-ERROR or supply
-an EXPORT-ERROR-HANDLER to observe them."
-  (check-type span span)
-  (let* ((options (%parse-keyword-options
-                   option-list '(:end-time :status :status-message)
-         "END-SPAN"))
-         (record nil)
-         (processors nil)
-         (exporter nil)
-         (provider (%span-provider span)))
-    (cl-concurrent-kit:with-lock-held ((%span-lock span))
-      (unless (%span-ended-p span)
-        (let* ((end-time
-                 (if (%option-supplied-p options :end-time)
-                     (%validate-trace-time (%option-value options :end-time nil)
-                                           "Span end time")
-                     (cl-boundary-kit:clock-now (%tracer-provider-clock provider))))
-               (end-monotonic (cl-boundary-kit:clock-monotonic
-                               (%tracer-provider-clock provider)))
-               (status (if (%option-supplied-p options :status)
-                           (%normalize-span-status (%option-value options :status nil))
-                           (%span-status span)))
-               (status-message
-                 (if (%option-supplied-p options :status-message)
-                     (%normalize-span-status-message
-                      (%option-value options :status-message nil))
-                     (%span-status-message span))))
-          (setf (%span-end-time span) end-time
-                (%span-end-monotonic span) end-monotonic
-                (%span-status span) status
-                (%span-status-message span) status-message
-                (%span-ended-p span) t)
-          (when (%span-recording-p span)
-            (setf record (%make-span-record-from-span
-                          span end-time end-monotonic status status-message)
-                exporter (%tracer-provider-exporter provider)))))
-    (when record
-      (setf processors (tracer-provider-span-processors provider))
-      (dolist (processor processors)
-        (%call-span-processor provider processor :on-end record)))
-    (when (and record exporter (span-record-sampled-p record))
-      (handler-case
-          (funcall exporter record)
-        (error (condition)
-          (%record-export-error provider condition record))))
-    span)))
+         (provider (%tracer-provider tracer)))
+    (multiple-value-bind (span recording-p processors)
+        (cl-concurrent-kit:with-lock-held ((%tracer-provider-lock provider))
+          (when (%tracer-provider-shutdown-p provider)
+            (error 'tracer-provider-shutdown :provider provider))
+          (%start-span-under-lock provider tracer span-name kind attributes
+                                  parent-context options))
+      (when recording-p
+        (dolist (processor processors)
+          (%call-span-processor provider processor :on-start span)))
+      span)))

@@ -1,5 +1,3 @@
-;;;; Detached span-record readers.
-
 #.(progn
     (in-package #:observability-kit)
     nil)
@@ -62,11 +60,11 @@
 
 (defun span-record-events (record)
   (check-type record span-record)
-  (mapcar #'%copy-span-event (%span-record-events record)))
+  (mapcar #'%copy-span-record-event (%span-record-events record)))
 
 (defun span-record-links (record)
   (check-type record span-record)
-  (mapcar #'%copy-span-link (%span-record-links record)))
+  (mapcar #'%copy-span-record-link (%span-record-links record)))
 
 (defun span-record-resource (record)
   (check-type record span-record)
