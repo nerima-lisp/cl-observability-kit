@@ -227,8 +227,8 @@ UNIT text.
 
 ### observability-kit/otlp
 
-Load cl-observability-kit/otlp for metric-snapshot->otlp, snapshot->otlp,
-registry->otlp, span-record->otlp, traces->otlp, log-record->otlp, and
+Load cl-observability-kit/otlp for metric-snapshot->otlp, registry->otlp,
+span-record->otlp, traces->otlp, log-record->otlp, and
 logs->otlp. These return deterministic Common Lisp alists shaped for an OTLP
 adapter. They do not encode JSON or protobuf, open a connection, or perform
 retries. Metric conversion accepts optional scope metadata; trace and log

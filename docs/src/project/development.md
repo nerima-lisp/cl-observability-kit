@@ -20,9 +20,9 @@ supported systems. The direct SBCL scripts are useful when diagnosing ASDF
 or test-runner behavior. The test system uses cl-weave and rejects an empty
 or partially non-runnable test selection.
 
-The Nix shell provides the pinned paredit-cli executable as paredit for
-read-only structural validation and analysis. Keep generated build output and
-coverage artifacts out of the repository.
+The Nix shell provides the pinned `paredit-cli` package; its executable is
+`paredit`. Use it for read-only structural validation and analysis. Keep
+generated build output and coverage artifacts out of the repository.
 
 ## Test and coverage boundary
 
@@ -104,7 +104,7 @@ model, registry, thread, and execution files; context, resource, trace,
 trace processors, sampler, propagation, structured-log, log SDK,
 configuration, and HTTP semantic-convention files. Prometheus source
 selection, formatting, and sample emission are separate files, as are OTLP
-conversion and the optional cl-log-kit bridge.
+common helpers, signal-specific conversion, and the optional cl-log-kit bridge.
 
 Tests live in t/ and are loaded through the cl-observability-kit/test system.
 Metric SDK and periodic lifecycle contracts live beside trace SDK, trace

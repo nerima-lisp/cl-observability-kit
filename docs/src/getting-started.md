@@ -348,9 +348,11 @@ Load cl-observability-kit/otlp when an application needs OTLP-shaped data:
 
 ~~~lisp
 (observability-kit/otlp:metric-snapshot->otlp metric-snapshot)
+(observability-kit/otlp:registry->otlp registry)
 (observability-kit/otlp:span-record->otlp span-record)
 (observability-kit/otlp:log-record->otlp log-record)
 (observability-kit/otlp:traces->otlp span-records)
+(observability-kit/otlp:logs->otlp log-records)
 ~~~
 
 These functions return deterministic Common Lisp alists for an adapter. They
