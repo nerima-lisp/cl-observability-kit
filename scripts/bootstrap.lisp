@@ -32,11 +32,16 @@
                         root)))))
 
 (defun initialize-source-registry (&optional (root (project-root)))
-  (asdf:initialize-source-registry
-   (cons :source-registry
-         (append (mapcar (lambda (path) (list :tree path))
-                         (source-roots root))
-                 (list :inherit-configuration))))
+  ;; The Nix development shell already installs a complete registry.  Adding
+  ;; it again makes ASDF scan SBCL contrib directories twice and can leave a
+  ;; long-running compiler with duplicate definitions.  Keep the explicit
+  ;; registry setup for plain local SBCL invocations.
+  (unless (uiop:getenv "CL_SOURCE_REGISTRY")
+    (asdf:initialize-source-registry
+     (cons :source-registry
+           (append (mapcar (lambda (path) (list :tree path))
+                           (source-roots root))
+                   (list :inherit-configuration)))))
   root)
 
 (defun source-files (&optional (root (project-root)))

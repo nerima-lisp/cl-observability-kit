@@ -105,8 +105,6 @@
 (defun %format-float-number (value)
   (%normalize-float-number (format nil "~,17G" value)))
 
-(defvar *default-histogram-boundary-strings* nil)
-
 (defun %number-string (value)
   (cond
     ((eq value +infinity+) "+Inf")
@@ -122,13 +120,6 @@
          (%format-float-number value)))
     (t
      (%export-error "Metric value ~S is not a supported real number." value))))
-
-(setf *default-histogram-boundary-strings*
-      (let ((cache (make-hash-table :test #'eql)))
-        (dolist (boundary observability-kit::*default-histogram-buckets* cache)
-          (setf (gethash boundary cache)
-                (%format-float-number boundary)))))
-
 (defun %write-number (value stream)
   (cond
     ((eq value +infinity+)

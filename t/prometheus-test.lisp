@@ -78,6 +78,22 @@
           (expect (null (search "authorization" text)) :to-be-truthy)
           (expect (null (search "secret" text)) :to-be-truthy))))))
 
+(describe "numeric exposition boundaries"
+  (it "renders exact rationals, floating values, and positive infinity"
+    (let* ((registry (make-metric-registry))
+          (rational-gauge (define-gauge registry ratio_value))
+          (float-gauge (define-gauge registry float_value)))
+      (metric-set rational-gauge 1/3)
+      (metric-set float-gauge 1.5d0)
+      (let ((text (observability-kit/prometheus:render-prometheus registry)))
+        (expect (search "ratio_value 0.3333333333333333" text)
+                :to-be-truthy)
+        (expect (search "float_value 1.5" text) :to-be-truthy)
+        (expect (string= "+Inf"
+                        (observability-kit/prometheus::%number-string
+                         observability-kit:+infinity+))
+                :to-be-truthy)))))
+
 (describe "exporter fuzz boundaries"
   (it-fuzz "renders generated label values without crashing"
       ((label-value

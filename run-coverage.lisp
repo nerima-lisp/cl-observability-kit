@@ -1,20 +1,25 @@
-(require "asdf")
-
 #+sbcl
 (progn
-  (require :sb-cover)
+  ;; Use SBCL's direct contrib loader.  REQUIRE delegates to ASDF in the Nix
+  ;; shell and can deadlock while it reconciles duplicate registry entries.
+  (funcall (symbol-function
+            (find-symbol "MODULE-PROVIDE-CONTRIB" "SB-IMPL"))
+           :sb-cover)
   (let ((policy (find-symbol "STORE-COVERAGE-DATA" "SB-COVER")))
     (unless policy
       (error "SB-COVER compiler policy is not available."))
     (proclaim `(optimize (,policy 3)))))
 
+(require "asdf")
+
 (defparameter *script-directory*
   (uiop:pathname-directory-pathname
    (or *load-truename* *default-pathname-defaults*)))
 
+(defparameter *coverage-timeout-seconds* 120
+  "Maximum time allowed for one complete coverage run.")
+
 (load (merge-pathnames "scripts/bootstrap.lisp" *script-directory*))
-(observability-kit.bootstrap:initialize-source-registry)
-(asdf:load-system "cl-weave")
 (load (merge-pathnames "scripts/test-plan.lisp" *script-directory*))
 
 (let* ((root (observability-kit.bootstrap:initialize-source-registry))
@@ -22,7 +27,6 @@
        (coverage-output (merge-pathnames "coverage.sexp" root))
        (coverage-excluded-files
          '("package.lisp"
-           "conditions.lisp"
            "validation-data.lisp"
            "metrics-declarations.lisp"
            "metrics-macros.lisp"
@@ -36,6 +40,7 @@
            "log-declarations.lisp"
            "log-kit-macros.lisp"
            "package-prometheus.lisp"
+           "prometheus-data.lisp"
            "package-otlp.lisp"
            "package-log-kit.lisp"))
        (coverage-source-pathnames
@@ -46,7 +51,8 @@
                  coverage-excluded-files))
        (success
          (handler-case
-             (progn
+             (sb-ext:with-timeout *coverage-timeout-seconds*
+               (progn
                ;; Remove prior outputs so a failed run cannot validate stale
                ;; coverage data or an old HTML report.
                (when (probe-file coverage-output)
@@ -61,30 +67,30 @@
                (format t "~&Coverage source policy: ~D source files, ~D excluded.~%"
                        (length coverage-source-pathnames)
                        (length coverage-exclude-pathnames))
-               ;; SB-COVER clears the source table as well as the execution
-               ;; bits.  Reload the implementation systems after the reset
-               ;; so optional exporters are part of the same measured run.
-               (asdf:load-system "cl-observability-kit/test" :force t)
-               (observability-kit.test-plan:assert-runnable-test-plan)
-               (cl-weave:reset-coverage)
+               ;; Compile implementation systems under SB-COVER before loading
+               ;; the test system.  This is cl-weave's coverage contract:
+               ;; coverage instrumentation must precede test-system loading.
                (dolist (system '("cl-observability-kit"
                                   "cl-observability-kit/prometheus"
                                   "cl-observability-kit/otlp"
                                   "cl-observability-kit/log-kit"))
                  (asdf:load-system system :force t))
+               (asdf:load-system "cl-observability-kit/test")
+               (observability-kit.test-plan:assert-runnable-test-plan)
+               (uiop:symbol-call '#:cl-weave '#:reset-coverage)
                (let ((result
-                       (cl-weave:run-all
-                        :reporter :spec
-                        :pass-with-no-tests nil
-                        :coverage t
-                        :coverage-output coverage-output
-                        :coverage-report-directory report-directory
-                        :coverage-include-pathnames
-                        coverage-source-pathnames
-                        :coverage-exclude-pathnames coverage-exclude-pathnames
-                        :coverage-minimum-expression 100
-                        :coverage-minimum-branch 100
-                        :coverage-reset nil)))
+                       (uiop:symbol-call '#:cl-weave '#:run-all
+                          :reporter :spec
+                          :pass-with-no-tests nil
+                          :coverage t
+                          :coverage-output coverage-output
+                          :coverage-report-directory report-directory
+                          :coverage-include-pathnames
+                          coverage-source-pathnames
+                          :coverage-exclude-pathnames coverage-exclude-pathnames
+                          :coverage-minimum-expression 100
+                          :coverage-minimum-branch 100
+                          :coverage-reset nil)))
                  (when result
                    (observability-kit.test-plan:assert-non-empty-file
                     coverage-output
@@ -92,7 +98,7 @@
                    (observability-kit.test-plan:assert-non-empty-file
                     (merge-pathnames "cover-index.html" report-directory)
                     "Coverage report"))
-                 result))
+                 result)))
            (error (condition)
              (format *error-output* "~&Coverage runner failed (~S): ~A~%"
                      (type-of condition)

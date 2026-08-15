@@ -6,7 +6,7 @@
   "Return the source-level metric name required by DEFINE-* macros.
 
 Metric names are intentionally compile-time symbols.  This keeps definitions
-readable and removes the old runtime string/designator compatibility surface."
+readable and removes the old runtime string/designator surface."
   (unless (and (symbolp name) (not (keywordp name)))
     (error 'program-error))
   (string-downcase (symbol-name name)))

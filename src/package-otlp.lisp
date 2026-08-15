@@ -76,7 +76,6 @@
                 #:proper-list-p
                 #:+infinity+)
   (:export #:metric-snapshot->otlp
-           #:snapshot->otlp
            #:registry->otlp
            #:span-record->otlp
            #:traces->otlp

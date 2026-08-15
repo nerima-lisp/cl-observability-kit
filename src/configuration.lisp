@@ -8,73 +8,6 @@ The parser deliberately returns data and strategy objects rather than mutating a
 global provider.  Applications can use the result to construct the providers
 they need while retaining ownership of their lifecycle."
 
-(defparameter +sdk-configuration-environment-names+
-  '("OTEL_SDK_DISABLED"
-    "OTEL_SERVICE_NAME"
-    "OTEL_RESOURCE_ATTRIBUTES"
-    "OTEL_PROPAGATORS"
-    "OTEL_METRIC_EXPORT_INTERVAL"
-    "OTEL_METRIC_EXPORT_TIMEOUT"
-    "OTEL_TRACES_SAMPLER"
-    "OTEL_TRACES_SAMPLER_ARG"
-    "OTEL_LOG_LEVEL"))
-
-(defstruct (sdk-configuration
-            (:constructor %make-sdk-configuration
-                (disabled-p service-name resource-attributes propagator
-                 metric-export-interval metric-export-timeout trace-sampler
-                 log-level))
-            (:conc-name %sdk-configuration-))
-  disabled-p
-  service-name
-  resource-attributes
-  propagator
-  metric-export-interval
-  metric-export-timeout
-  trace-sampler
-  log-level)
-
-(defun %configuration-error (name message)
-  (error 'configuration-error :name name :message message))
-
-(defun sdk-configuration-disabled-p (configuration)
-  (check-type configuration sdk-configuration)
-  (not (null (%sdk-configuration-disabled-p configuration))))
-
-(defun sdk-configuration-service-name (configuration)
-  (check-type configuration sdk-configuration)
-  (and (%sdk-configuration-service-name configuration)
-       (copy-seq (%sdk-configuration-service-name configuration))))
-
-(defun sdk-configuration-resource-attributes (configuration)
-  (check-type configuration sdk-configuration)
-  (%copy-alist (%sdk-configuration-resource-attributes configuration)))
-
-(defun sdk-configuration-resource (configuration)
-  (check-type configuration sdk-configuration)
-  (make-resource :attributes
-                 (sdk-configuration-resource-attributes configuration)))
-
-(defun sdk-configuration-propagator (configuration)
-  (check-type configuration sdk-configuration)
-  (%sdk-configuration-propagator configuration))
-
-(defun sdk-configuration-metric-export-interval (configuration)
-  (check-type configuration sdk-configuration)
-  (%sdk-configuration-metric-export-interval configuration))
-
-(defun sdk-configuration-metric-export-timeout (configuration)
-  (check-type configuration sdk-configuration)
-  (%sdk-configuration-metric-export-timeout configuration))
-
-(defun sdk-configuration-trace-sampler (configuration)
-  (check-type configuration sdk-configuration)
-  (%sdk-configuration-trace-sampler configuration))
-
-(defun sdk-configuration-log-level (configuration)
-  (check-type configuration sdk-configuration)
-  (%sdk-configuration-log-level configuration))
-
 (defun %configuration-trim (value)
   (string-trim '(#\Space #\Tab #\Return #\Linefeed) value))
 
@@ -265,10 +198,6 @@ they need while retaining ownership of their lifecycle."
      (make-b3-propagator))
     ((string= token "b3multi")
      (make-b3-multi-propagator))
-    ((string= token "jaeger")
-     (make-jaeger-propagator))
-    ((string= token "xray")
-     (make-xray-propagator))
     (t
      (%configuration-error "OTEL_PROPAGATORS"
                            "The configured propagator is not supported."))))
@@ -284,12 +213,11 @@ they need while retaining ownership of their lifecycle."
         (%configuration-error "OTEL_PROPAGATORS"
                               "A propagator was configured more than once."))
       (setf (gethash token seen) t)
-      (unless (member token '("tracecontext" "baggage" "b3" "b3multi"
-                              "jaeger" "xray" "none")
+      (unless (member token '("tracecontext" "baggage" "b3" "b3multi" "none")
                       :test #'string=)
         (%configuration-error
          "OTEL_PROPAGATORS"
-         "Supported propagators are tracecontext, baggage, b3, b3multi, jaeger, xray, and none.")))
+         "Supported propagators are tracecontext, baggage, b3, b3multi, and none.")))
     (if (member "none" tokens :test #'string=)
         (if (= 1 (length tokens))
             (make-composite-propagator)
@@ -302,11 +230,6 @@ they need while retaining ownership of their lifecycle."
             (make-w3c-propagator)
             (apply #'make-composite-propagator
                    (mapcar #'%configuration-propagator-for-token tokens))))))
-
-(defun %configuration-parent-sampled-p (context)
-  (and context
-       (let ((flags (instrumentation-context-trace-flags context)))
-         (and (integerp flags) (logbitp 0 flags)))))
 
 (defun %configuration-parent-sampler (root-decision)
   (make-parent-based-sampler root-decision))

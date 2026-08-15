@@ -416,8 +416,7 @@
         (expect (observability-kit/otlp:metric-snapshot->otlp
                  (first (metric-snapshot registry)))
                 :to-be-truthy)
-        (expect (observability-kit/otlp:snapshot->otlp histogram) :to-be-truthy)
-        (expect (observability-kit/otlp:snapshot->otlp (metric-snapshot histogram))
+        (expect (observability-kit/otlp:metric-snapshot->otlp (metric-snapshot histogram))
                 :to-be-truthy)
         (expect (observability-kit/otlp:registry->otlp histogram) :to-be-truthy)
         (expect (observability-kit/otlp:registry->otlp
@@ -434,9 +433,25 @@
                  :count 2
                  :sum 3)))
           (expect (cdr (assoc "count" data-point :test #'string=)) :to-equal 2)
-          (expect (cdr (assoc "sum" data-point :test #'string=)) :to-equal 3)))
+          (expect (cdr (assoc "sum" data-point :test #'string=)) :to-equal 3))
+        (let* ((sample (edge-sample "edge" :histogram
+                                    :timestamp 10
+                                    :start-time 5))
+               (snapshot (observability-kit::make-metric-snapshot
+                          :name "edge_histogram"
+                          :help "edge"
+                          :type :histogram
+                          :samples (list sample)))
+               (metric (observability-kit/otlp:metric-snapshot->otlp
+                        snapshot))
+               (data-point (first (cdr (assoc "data-points" metric
+                                              :test #'string=)))))
+          (expect (cdr (assoc "timestamp" data-point :test #'string=))
+                  :to-equal 10)
+          (expect (cdr (assoc "start-time" data-point :test #'string=))
+                  :to-equal 5)))
       (signals observability-error
-        (observability-kit/otlp:snapshot->otlp :not-a-metric))
+               (observability-kit/otlp:metric-snapshot->otlp :not-a-metric))
       (signals observability-error
         (observability-kit/otlp:registry->otlp registry :scope-name 1))
       (signals observability-error
