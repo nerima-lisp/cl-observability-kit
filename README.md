@@ -9,8 +9,8 @@ The SDK layer includes synchronous and observable metric instruments, detached
 snapshots, readers, periodic collection, tracer and meter providers, span and
 log processors, synchronous and bounded batch span processors, samplers,
 lifecycle callbacks, and a validated environment configuration parser.
-Propagation adapters cover W3C Trace Context and Baggage, B3, B3 multi-header,
-Jaeger, and AWS X-Ray carriers.
+Propagation carriers cover W3C Trace Context and Baggage, B3, and B3
+multi-header carriers.
 
 The transport boundary is deliberate. Applications and integration packages
 own HTTP clients and servers, logger sinks, wire encoding, transport-level
@@ -37,7 +37,7 @@ connection or starts a network client.
 Metric definitions require symbol names, and labelled updates require the
 complete declared label set. See [Getting started](docs/src/getting-started.md)
 for provider lifecycle, health checks, tracing, logs, propagation, and
-transport adapters, including simple and batch span processors.
+transport carriers, including simple and batch span processors.
 
 Structured log records carry `timestamp`, `observed-timestamp`, normalized
 severity text and number, body, an optional event name, attributes,

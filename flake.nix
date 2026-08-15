@@ -99,5 +99,20 @@
       devShellPackages = ctx: [
         paredit-cli.packages.${ctx.system}.default
       ];
+
+      extraOutputs =
+        ctx:
+        let
+          coverage = ctx.cl.mkCoverageReport {
+            drv = ctx.package.enableCheck;
+            name = "cl-observability-kit-coverage";
+            systems = [ "cl-observability-kit/test" ];
+            timeoutSeconds = 300;
+          };
+        in
+        {
+          packages.coverage = coverage;
+          checks.coverage = coverage;
+        };
     };
 }

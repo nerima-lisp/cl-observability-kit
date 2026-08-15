@@ -239,8 +239,7 @@ policy. `:flush` and `:shutdown` callbacks receive the provider. An
 `:error-handler` receives the error and the failed callback argument (the
 batch for an exporter failure, or `nil` for a worker lifecycle failure).
 
-Install these processors through `:span-processors` and leave the provider's
-legacy direct `:exporter` option unset; configuring both exports a span twice.
+Install these processors through `:span-processors`.
 Both built-in processors invoke application callbacks only. Serialization,
 retry policy, and network I/O remain integration responsibilities.
 
@@ -296,8 +295,7 @@ propagator are replaced:
 ~~~
 
 The default configuration is W3C Trace Context plus W3C Baggage. The
-propagation API also provides B3 single-header, B3 multi-header, Jaeger, and
-AWS X-Ray adapters:
+propagation API also provides B3 single-header and B3 multi-header carriers:
 
 ~~~lisp
 (let ((b3 (observability-kit:make-b3-propagator)))
@@ -308,7 +306,7 @@ AWS X-Ray adapters:
 ~~~
 
 Use make-composite-propagator to try configured propagators in order during
-extraction and to inject through all of them. The adapters do not perform
+extraction and to inject through all of them. The carriers do not perform
 I/O. traceparent, tracestate, and baggage are validated at the trusted
 boundary; callers should still apply their own trust and redaction policy.
 
@@ -332,7 +330,7 @@ configuration deterministic in tests and in application startup:
 The parser covers SDK disabled state, service name, resource attributes,
 propagator selection, metric export interval and timeout, local trace sampler,
 sampler argument, and log level. Supported propagator tokens are
-tracecontext, baggage, b3, b3multi, jaeger, xray, and none. Unsupported or
+tracecontext, baggage, b3, b3multi, and none. Unsupported or
 conflicting propagator or sampler selections signal configuration-error;
 invalid ratio arguments use the documented default instead of being evaluated
 as code.
@@ -355,5 +353,5 @@ Load cl-observability-kit/otlp when an application needs OTLP-shaped data:
 (observability-kit/otlp:logs->otlp log-records)
 ~~~
 
-These functions return deterministic Common Lisp alists for an adapter. They
+These functions return deterministic Common Lisp alists for a carrier. They
 do not perform serialization, retries, batching, or network I/O.

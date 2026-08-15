@@ -117,9 +117,9 @@ exporter I/O.
   across worker-thread boundaries, plus immutable resource metadata shared
   across metric, trace, and log records.
 - **Propagation** — W3C Trace Context and Baggage as the default propagator,
-  plus B3 single-header, B3 multi-header, Jaeger, and AWS X-Ray adapters, and
-  a composite propagator that chains multiple adapters. All adapters operate
-  on detached header alists and never perform I/O.
+  plus B3 single-header and B3 multi-header carriers, and a composite
+  propagator that chains multiple carriers. All carriers operate on detached
+  header alists and never perform I/O.
 - **HTTP semantic conventions** — validated request/response attribute
   helpers (`http-request-attributes`, `http-response-attributes`,
   `span-set-http-request`, `span-set-http-response`) for attaching
@@ -134,7 +134,7 @@ exporter I/O.
   exposition via `render-prometheus`, including cumulative histogram bucket
   samples and escaped label/HELP/UNIT text.
 - **cl-observability-kit/otlp** — a transport-neutral OTLP-shaped document
-  adapter converting metric snapshots, span records, and log records into
+  converter converting metric snapshots, span records, and log records into
   deterministic Common Lisp alists, without JSON/protobuf encoding or network
   I/O.
 - **cl-observability-kit/log-kit** — an optional bridge that maps

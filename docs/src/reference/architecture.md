@@ -10,7 +10,7 @@ logger handlers or sinks, wire encoding, or deployment policy.
 
 | System | Owns | Does not own |
 | --- | --- | --- |
-| cl-observability-kit | metric instruments and aggregation, readers, periodic collection, health semantics, cancellation tokens, resources, context, sampler decisions, tracer/provider/span lifecycle, structured logs, synchronous and bounded batch span processors, W3C and adapter propagation, HTTP semantic conventions, environment parsing | HTTP I/O, logger handlers and sinks, wire encoding, network I/O, network exporter queues and retries |
+| cl-observability-kit | metric instruments and aggregation, readers, periodic collection, health semantics, cancellation tokens, resources, context, sampler decisions, tracer/provider/span lifecycle, structured logs, synchronous and bounded batch span processors, W3C and carrier propagation, HTTP semantic conventions, environment parsing | HTTP I/O, logger handlers and sinks, wire encoding, network I/O, network exporter queues and retries |
 | cl-observability-kit/prometheus | deterministic Prometheus text rendering and escaping | an HTTP server or /metrics route |
 | cl-observability-kit/otlp | deterministic OTLP-shaped Common Lisp data | JSON/protobuf encoding, an OTLP client, export retries |
 | cl-observability-kit/log-kit | explicit context-field mapping to cl-log-kit | log records, handlers, sinks, formatting, span lifecycle |
@@ -81,8 +81,8 @@ The source layout keeps the primary data model separate from operations:
   lifecycle callbacks; trace-records.lisp exposes detached span records.
 - propagation.lisp formats and validates W3C traceparent, tracestate, and
   baggage values without performing I/O.
-- propagator.lisp composes propagation adapters.
-- propagation-adapters.lisp implements B3, Jaeger, and AWS X-Ray carriers.
+- propagator.lisp composes propagation carriers.
+- propagation-carriers.lisp implements B3 single- and multi-header carriers.
 - configuration.lisp parses validated SDK environment settings.
 - log-operation.lisp and log-sdk.lisp create detached structured log records,
   providers, processors, and logger scopes.
@@ -131,12 +131,11 @@ carrier boundary; the application owns the carrier and its network transport.
 The ratio sampler validates the closed interval from zero through one and
 decides deterministically from the candidate trace ID. Parent-based sampling
 preserves a valid parent decision and delegates root spans to its configured
-root sampler. Custom sampler callbacks retain the four-argument API so
-existing instrumentation remains compatible.
+root sampler. Custom sampler callbacks use the four-argument API.
 
 The default propagator is W3C Trace Context plus W3C Baggage. The core also
-provides B3 single-header, B3 multi-header, Jaeger, and AWS X-Ray adapters,
-plus a composite propagator. Adapter injection and extraction operate on
+provides B3 single-header and B3 multi-header carriers, plus a composite
+propagator. Carrier injection and extraction operate on
 detached header alists and never perform I/O. Applications own carrier
 transport, trust policy, and redaction.
 
@@ -204,7 +203,6 @@ files. The excluded declaration and macro-expansion files are:
 
 ~~~text
 package.lisp
-conditions.lisp
 validation-data.lisp
 metrics-declarations.lisp
 metrics-macros.lisp
