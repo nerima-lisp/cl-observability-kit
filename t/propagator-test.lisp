@@ -159,15 +159,17 @@
               :to-equal
               1)))
 
-  (it "covers unsampled injection and B3 extraction boundaries"
+  (it "covers unsampled injection and compatibility extraction boundaries"
     (let* ((context
              (make-instrumentation-context
               :trace-id "0123456789abcdef0123456789abcdef"
               :span-id "fedcba9876543210"
               :trace-flags 0))
            (b3 (make-b3-propagator))
-           (b3-multi (make-b3-multi-propagator)))
-      (dolist (propagator (list b3 b3-multi))
+           (b3-multi (make-b3-multi-propagator))
+           (jaeger (make-jaeger-propagator))
+           (xray (make-xray-propagator)))
+      (dolist (propagator (list b3 b3-multi jaeger xray))
         (let ((headers (propagator-inject propagator context nil)))
           (expect headers :to-be-truthy)
           (expect (propagator-extract propagator headers)
@@ -208,8 +210,78 @@
                    ("x-b3-sampled" . "not-sampled")
                    ("x-b3-flags" . "not-flags"))))
         (expect (propagator-extract b3 headers)
+                :to-be-falsy))
+      (dolist (headers
+                '((("uber-trace-id" . "bad"))
+                  (("uber-trace-id"
+                    . "0123456789abcdef:fedcba9876543210:00:zz"))
+                  (("uber-trace-id"
+                    . "bad:fedcba9876543210:00:01"))
+                  (("uber-trace-id"
+                    . "0123456789abcdef:bad:00:01"))))
+        (expect (propagator-extract jaeger headers)
+                :to-be-falsy))
+      (dolist (headers
+                '((("x-amzn-trace-id" . "bad"))
+                  (("x-amzn-trace-id"
+                    . "Root=bad;Parent=fedcba9876543210;Sampled=1"))
+                  (("x-amzn-trace-id"
+                    . "Root=1-01234567-89abcdef0123456789abcdef;Parent=bad;Sampled=1"))
+                  (("x-amzn-trace-id"
+                    . "Root=1-01234567-89abcdef0123456789abcdef;Parent=fedcba9876543210;Sampled=2"))
+                  (("x-amzn-trace-id" . "Root=1-01234567"))
+                  (("x-amzn-trace-id" . "=value"))))
+        (expect (propagator-extract xray headers)
                 :to-be-falsy))))
-  (it "rejects invalid context fields during B3 injection"
+
+  (it "preserves unknown sampling state across compatibility boundaries"
+    (let* ((trace-id "0123456789abcdef0123456789abcdef")
+           (span-id "fedcba9876543210")
+           (context
+             (make-instrumentation-context
+              :trace-id trace-id
+              :span-id span-id))
+           (b3 (make-b3-propagator))
+           (b3-multi (make-b3-multi-propagator))
+           (jaeger (make-jaeger-propagator))
+           (xray (make-xray-propagator))
+           (b3-value (format nil "~A-~A" trace-id span-id))
+           (xray-root (format nil "Root=1-~A-~A"
+                              (subseq trace-id 0 8)
+                              (subseq trace-id 8))))
+      (expect (propagator-inject b3 context nil)
+              :to-equal
+              (list (cons "b3" b3-value)))
+      (expect (propagator-inject b3-multi context nil)
+              :to-equal
+              (list (cons "x-b3-traceid" trace-id)
+                    (cons "x-b3-spanid" span-id)))
+      (expect (propagator-inject jaeger context nil) :to-equal nil)
+      (expect (propagator-inject xray context nil)
+              :to-equal
+              (list (cons "x-amzn-trace-id"
+                          (format nil "~A;Parent=~A" xray-root span-id))))
+      (dolist (propagator-and-headers
+                (list (list b3 (list (cons "b3" b3-value)))
+                      (list b3-multi
+                            (list (cons "x-b3-traceid" trace-id)
+                                  (cons "x-b3-spanid" span-id)))
+                      (list xray
+                            (list (cons "x-amzn-trace-id"
+                                        (format nil "~A;Parent=~A"
+                                                xray-root span-id))))
+                      (list xray
+                            (list (cons "x-amzn-trace-id"
+                                        (format nil "~A;Parent=~A;Sampled=?"
+                                                xray-root span-id))))))
+        (let ((extracted
+                (propagator-extract (first propagator-and-headers)
+                                    (second propagator-and-headers))))
+          (expect extracted :to-be-truthy)
+          (expect (instrumentation-context-trace-flags extracted)
+                  :to-be-falsy)))))
+
+  (it "rejects invalid context fields during compatibility injection"
     (let ((bad-trace
             (make-instrumentation-context
              :trace-id "not-a-trace-id"
@@ -220,9 +292,41 @@
              :span-id "not-a-span-id")))
       (dolist (propagator
                 (list (make-b3-propagator)
-                      (make-b3-multi-propagator)))
+                      (make-b3-multi-propagator)
+                      (make-jaeger-propagator)
+                      (make-xray-propagator)))
         (signals propagation-error
           (propagator-inject propagator bad-trace nil))
-          (signals propagation-error
+        (signals propagation-error
           (propagator-inject propagator bad-span nil)))))
-)
+
+  (it "round-trips Jaeger and X-Ray compatibility headers"
+    (let* ((context
+             (make-instrumentation-context
+              :trace-id "0123456789abcdef0123456789abcdef"
+              :span-id "fedcba9876543210"
+              :trace-flags 1))
+           (jaeger (make-jaeger-propagator))
+           (jaeger-headers (propagator-inject jaeger context nil))
+           (jaeger-context (propagator-extract jaeger jaeger-headers))
+           (xray (make-xray-propagator))
+           (xray-headers (propagator-inject xray context nil))
+           (xray-context (propagator-extract xray xray-headers)))
+      (expect (cdr (assoc "uber-trace-id" jaeger-headers :test #'string-equal))
+              :to-equal
+              "0123456789abcdef0123456789abcdef:fedcba9876543210:0000000000000000:01")
+      (expect (instrumentation-context-trace-id jaeger-context)
+              :to-equal
+              (instrumentation-context-trace-id context))
+      (expect (instrumentation-context-span-id jaeger-context)
+              :to-equal
+              (instrumentation-context-span-id context))
+      (expect (cdr (assoc "x-amzn-trace-id" xray-headers :test #'string-equal))
+              :to-equal
+              "Root=1-01234567-89abcdef0123456789abcdef;Parent=fedcba9876543210;Sampled=1")
+      (expect (instrumentation-context-trace-id xray-context)
+              :to-equal
+              (instrumentation-context-trace-id context))
+      (expect (instrumentation-context-trace-flags xray-context)
+              :to-equal
+              1))))

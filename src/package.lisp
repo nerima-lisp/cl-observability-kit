@@ -123,7 +123,9 @@
    #:register-metric-reader
    #:collect-metric-reader
    #:force-flush-metric-reader
+   #:metric-reader-force-flush
    #:shutdown-metric-reader
+   #:metric-reader-shutdown
    #:periodic-metric-reader
    #:periodic-metric-reader-p
    #:make-periodic-metric-reader
@@ -373,6 +375,8 @@
    #:make-composite-propagator
    #:make-b3-propagator
    #:make-b3-multi-propagator
+   #:make-jaeger-propagator
+   #:make-xray-propagator
 
    ;; HTTP semantic conventions
    #:http-request-attributes

@@ -418,6 +418,9 @@
                 :to-be-truthy)
         (expect (observability-kit/otlp:metric-snapshot->otlp (metric-snapshot histogram))
                 :to-be-truthy)
+        (expect (observability-kit/otlp:snapshot->otlp histogram) :to-be-truthy)
+        (expect (observability-kit/otlp:snapshot->otlp (metric-snapshot histogram))
+                :to-be-truthy)
         (expect (observability-kit/otlp:registry->otlp histogram) :to-be-truthy)
         (expect (observability-kit/otlp:registry->otlp
                  (metric-snapshot histogram))
@@ -452,6 +455,8 @@
                   :to-equal 5)))
       (signals observability-error
                (observability-kit/otlp:metric-snapshot->otlp :not-a-metric))
+      (signals observability-error
+        (observability-kit/otlp:snapshot->otlp :not-a-metric))
       (signals observability-error
         (observability-kit/otlp:registry->otlp registry :scope-name 1))
       (signals observability-error

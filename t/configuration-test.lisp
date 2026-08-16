@@ -191,11 +191,11 @@
                        context "child" :internal nil)
               :to-equal :record-and-sample)))
 
-  (it "configures supported B3 propagators"
+  (it "configures established compatibility propagators"
     (let* ((configuration
              (observability-kit:read-sdk-configuration
               :environment
-              '(("OTEL_PROPAGATORS" . "b3,b3multi"))))
+              '(("OTEL_PROPAGATORS" . "b3,b3multi,jaeger,xray"))))
            (context
              (observability-kit:make-instrumentation-context
               :trace-id "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -212,6 +212,10 @@
       (expect (cdr (assoc "b3" headers :test #'string-equal))
               :to-be-truthy)
       (expect (cdr (assoc "x-b3-traceid" headers :test #'string-equal))
+              :to-be-truthy)
+      (expect (cdr (assoc "uber-trace-id" headers :test #'string-equal))
+              :to-be-truthy)
+      (expect (cdr (assoc "x-amzn-trace-id" headers :test #'string-equal))
               :to-be-truthy)
       (expect (instrumentation-context-trace-id extracted)
               :to-equal
