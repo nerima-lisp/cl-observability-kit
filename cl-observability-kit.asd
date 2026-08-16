@@ -1,12 +1,21 @@
 (in-package #:asdf-user)
 
 (asdf:defsystem "cl-observability-kit"
+  ;; All eight metadata fields are mandatory across the org: :homepage,
+  ;; :bug-tracker and :source-control are what let a consumer find the project
+  ;; from an ASDF listing alone.
   :description "A small, deterministic observability substrate for Common Lisp."
   :long-description "Metrics, health checks, readiness semantics, and instrumentation context without transport or route ownership."
-  :author "Project contributors"
-  :maintainer "Project contributors"
+  :author "takeokunn <bararararatty@gmail.com>"
+  :maintainer "takeokunn <bararararatty@gmail.com>"
   :license "MIT"
-  :version "0.1.0"
+  ;; Single source of truth for the version; every system in this file repeats
+  ;; it because they are released together. flake.nix reads this form, and
+  ;; release.yml refuses to publish a tag that disagrees with it.
+  :version "1.0.0"
+  :homepage "https://github.com/nerima-lisp/cl-observability-kit"
+  :bug-tracker "https://github.com/nerima-lisp/cl-observability-kit/issues"
+  :source-control (:git "https://github.com/nerima-lisp/cl-observability-kit.git")
   :pathname "src"
   :depends-on ((:version "cl-concurrent-kit" "0.6.1")
                (:version "cl-boundary-kit" "2.3.0"))
@@ -59,9 +68,13 @@
 
 (asdf:defsystem "cl-observability-kit/prometheus"
   :description "Prometheus text exposition for cl-observability-kit snapshots."
-  :author "Project contributors"
+  :author "takeokunn <bararararatty@gmail.com>"
+  :maintainer "takeokunn <bararararatty@gmail.com>"
   :license "MIT"
-  :version "0.1.0"
+  :version "1.0.0"
+  :homepage "https://github.com/nerima-lisp/cl-observability-kit"
+  :bug-tracker "https://github.com/nerima-lisp/cl-observability-kit/issues"
+  :source-control (:git "https://github.com/nerima-lisp/cl-observability-kit.git")
   :depends-on ("cl-observability-kit")
   :pathname "src"
   :serial t
@@ -73,9 +86,13 @@
 
 (asdf:defsystem "cl-observability-kit/otlp"
   :description "A transport-neutral OTLP-shaped document adapter."
-  :author "Project contributors"
+  :author "takeokunn <bararararatty@gmail.com>"
+  :maintainer "takeokunn <bararararatty@gmail.com>"
   :license "MIT"
-  :version "0.1.0"
+  :version "1.0.0"
+  :homepage "https://github.com/nerima-lisp/cl-observability-kit"
+  :bug-tracker "https://github.com/nerima-lisp/cl-observability-kit/issues"
+  :source-control (:git "https://github.com/nerima-lisp/cl-observability-kit.git")
   :depends-on ("cl-observability-kit")
   :pathname "src"
   :serial t
@@ -87,9 +104,13 @@
 
 (asdf:defsystem "cl-observability-kit/log-kit"
   :description "Optional instrumentation-context bridge for cl-log-kit."
-  :author "Project contributors"
+  :author "takeokunn <bararararatty@gmail.com>"
+  :maintainer "takeokunn <bararararatty@gmail.com>"
   :license "MIT"
-  :version "0.1.0"
+  :version "1.0.0"
+  :homepage "https://github.com/nerima-lisp/cl-observability-kit"
+  :bug-tracker "https://github.com/nerima-lisp/cl-observability-kit/issues"
+  :source-control (:git "https://github.com/nerima-lisp/cl-observability-kit.git")
   :depends-on ("cl-observability-kit"
                (:version "cl-log-kit" "2.2.0"))
   :pathname "src"
@@ -100,8 +121,13 @@
 
 (asdf:defsystem "cl-observability-kit/test"
   :description "Tests for cl-observability-kit and its optional adapters."
-  :author "Project contributors"
+  :author "takeokunn <bararararatty@gmail.com>"
+  :maintainer "takeokunn <bararararatty@gmail.com>"
   :license "MIT"
+  :version "1.0.0"
+  :homepage "https://github.com/nerima-lisp/cl-observability-kit"
+  :bug-tracker "https://github.com/nerima-lisp/cl-observability-kit/issues"
+  :source-control (:git "https://github.com/nerima-lisp/cl-observability-kit.git")
   :depends-on ("cl-observability-kit/prometheus"
                "cl-observability-kit/otlp"
                "cl-observability-kit/log-kit"

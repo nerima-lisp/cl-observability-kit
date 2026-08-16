@@ -10,7 +10,7 @@ cl-observability-kit.asd, or enter the Nix development shell:
 nix develop
 ~~~
 
-Pin to the `v0.1.0` tag for a reproducible checkout, or use `main` for the
+Pin to the `v1.0.0` tag for a reproducible checkout, or use `main` for the
 current development source. There is no Quicklisp or Ultralisp distribution;
 installation is a git checkout made visible to ASDF.
 

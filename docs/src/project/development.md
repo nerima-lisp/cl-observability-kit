@@ -24,6 +24,21 @@ The Nix shell provides the pinned `paredit-cli` package; its executable is
 `paredit`. Use it for read-only structural validation and analysis. Keep
 generated build output and coverage artifacts out of the repository.
 
+## Continuous integration
+
+Four GitHub Actions workflows share one `nix-setup` composite action, which is
+the single place the Nix installer and Cachix action revisions are pinned:
+
+| Workflow | Trigger | What it enforces |
+| --- | --- | --- |
+| ci.yml | push to main, pull request | `nix flake check` and `git diff --check` |
+| docs.yml | push to main touching docs or the flake | Builds `.#docs` and publishes it to GitHub Pages |
+| release.yml | push of a `v*.*.*` tag | The tag matches every `:version` in the .asd, `nix flake check` passes on the tagged tree, then a draft release is opened |
+| flake-update.yml | weekly, or manual dispatch | Proposes a `flake.lock` update as a pull request |
+
+CI runs on Linux only. The flake declares `aarch64-darwin` as well, and that
+attribute set is covered by developers running the commands above locally.
+
 ## Test and coverage boundary
 
 run-tests.lisp bootstraps the local source registry, loads the test system,

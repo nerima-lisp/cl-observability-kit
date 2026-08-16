@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Getting started
+    url: https://nerima-lisp.github.io/cl-observability-kit/getting-started/
+    about: Check the load order, provider lifecycle, and adapter usage before filing.
+  - name: Architecture and boundaries
+    url: https://nerima-lisp.github.io/cl-observability-kit/reference/architecture/
+    about: Confirm whether the behavior belongs to the core or the application boundary.
+  - name: Security reporting
+    url: https://github.com/nerima-lisp/cl-observability-kit/security/advisories/new
+    about: Report vulnerabilities through the private security contact path.
