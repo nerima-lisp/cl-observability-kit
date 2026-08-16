@@ -72,7 +72,7 @@
 The default CONTEXT is the currently bound instrumentation context; pass
 `:context NIL` to make an explicitly uncorrelated record.  The returned
 record, its attributes, context, and resource are detached copies suitable
-for retaining until an exporter or adapter consumes them."
+for retaining until an exporter or carrier consumes them."
   (let* ((options (%parse-keyword-options
                    option-list
                    '(:timestamp :observed-timestamp :severity :severity-number :body :attributes

@@ -31,12 +31,41 @@
                         (format nil "../~A/" system)
                         root)))))
 
-(defun initialize-source-registry (&optional (root (project-root)))
+(defun environment-source-roots ()
+  (remove-if-not
+   #'probe-file
+   (remove-duplicates
+    (mapcar #'uiop:ensure-directory-pathname
+            (remove nil
+                    (uiop:split-native-pathnames-string
+                     (or (uiop:getenv "CL_SOURCE_REGISTRY") ""))))
+    :test #'equal)))
+
+(defun dependency-source-roots ()
+  (remove-duplicates
+   (loop for environment-root in (environment-source-roots)
+         when (some (lambda (system)
+                      (probe-file
+                       (merge-pathnames
+                        (format nil "~A.asd" system)
+                        environment-root)))
+                    *sibling-systems*)
+           collect environment-root)
+   :test #'equal))
+
+(defun initialize-source-registry (&key (root (project-root))
+                                   ignore-inherited-configuration)
   (asdf:initialize-source-registry
    (cons :source-registry
-         (append (mapcar (lambda (path) (list :tree path))
-                         (source-roots root))
-                 (list :inherit-configuration))))
+         (append
+          (mapcar (lambda (path) (list :directory path))
+                  (source-roots root))
+          (when ignore-inherited-configuration
+            (mapcar (lambda (path) (list :directory path))
+                    (dependency-source-roots)))
+          (list (if ignore-inherited-configuration
+                    :ignore-inherited-configuration
+                    :inherit-configuration)))))
   root)
 
 (defun source-files (&optional (root (project-root)))

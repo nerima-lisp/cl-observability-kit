@@ -33,7 +33,7 @@ generic span processor callbacks: FLUSH and SHUTDOWN receive the provider,
 and ERROR-HANDLER receives an error and the callback argument that failed.
 
 Install this processor in a TRACER-PROVIDER's SPAN-PROCESSORS option and leave
-the provider's legacy direct EXPORTER option NIL when using this processor,
+the provider's direct EXPORTER option NIL when using this processor,
 otherwise both export paths will run."
   (let* ((options (%parse-keyword-options
                    option-list
@@ -89,7 +89,7 @@ optional callback receiving an error and the batch (or NIL for a worker
 lifecycle error).
 
 Install this processor in a TRACER-PROVIDER's SPAN-PROCESSORS option and leave
-the provider's legacy direct EXPORTER option NIL when using this processor,
+the provider's direct EXPORTER option NIL when using this processor,
 otherwise both export paths will run."
   (let* ((options (%parse-keyword-options
                    option-list

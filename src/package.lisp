@@ -112,7 +112,6 @@
    #:meter-name
    #:meter-version
    #:meter-schema-url
-   #:meter-provider
    #:meter-registry
    #:metric-reader
    #:metric-reader-p

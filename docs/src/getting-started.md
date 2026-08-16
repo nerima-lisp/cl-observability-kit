@@ -10,7 +10,7 @@ cl-observability-kit.asd, or enter the Nix development shell:
 nix develop
 ~~~
 
-Pin to the `v0.1.0` tag for a reproducible checkout, or use `main` for the
+Pin to the `v1.0.0` tag for a reproducible checkout, or use `main` for the
 current development source. There is no Quicklisp or Ultralisp distribution;
 installation is a git checkout made visible to ASDF.
 
@@ -348,9 +348,11 @@ Load cl-observability-kit/otlp when an application needs OTLP-shaped data:
 
 ~~~lisp
 (observability-kit/otlp:metric-snapshot->otlp metric-snapshot)
+(observability-kit/otlp:registry->otlp registry)
 (observability-kit/otlp:span-record->otlp span-record)
 (observability-kit/otlp:log-record->otlp log-record)
 (observability-kit/otlp:traces->otlp span-records)
+(observability-kit/otlp:logs->otlp log-records)
 ~~~
 
 These functions return deterministic Common Lisp alists for an adapter. They

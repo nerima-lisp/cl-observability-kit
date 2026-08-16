@@ -26,3 +26,5 @@
                 #:proper-list-p
                 #:+infinity+)
   (:export #:render-prometheus))
+
+(defvar observability-kit/prometheus::*default-histogram-boundary-strings*)

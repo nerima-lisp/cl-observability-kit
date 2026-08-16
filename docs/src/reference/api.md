@@ -44,7 +44,7 @@ values cannot be negative, and all metric values must be finite real numbers.
 | meter-registry meter | Return the registry owned by a meter. |
 | make-metric-reader source &rest option-list | Create a pull reader from a metric, registry, meter, or provider. Options are :exporter, :flush, :shutdown, and :error-handler. |
 | collect-metric-reader reader &key export-p | Collect detached snapshots and optionally call the exporter. |
-| force-flush-metric-reader, shutdown-metric-reader | Run reader lifecycle callbacks; shutdown is idempotent. |
+| force-flush-metric-reader, shutdown-metric-reader | Run reader lifecycle callbacks; shutdown is idempotent. metric-reader-force-flush and metric-reader-shutdown are compatibility spellings of the same two operations. |
 | make-periodic-metric-reader source &rest option-list | Wrap a reader with a worker. :interval is in seconds, :start defaults to true, and reader callback options are forwarded. |
 | start-periodic-metric-reader, collect-periodic-metric-reader | Start a periodic worker or collect it immediately. |
 | force-flush-periodic-metric-reader, shutdown-periodic-metric-reader | Flush a periodic reader or stop/join its worker and shut it down. |
@@ -211,7 +211,7 @@ span; it is not an HTTP client or server:
 | Operation | Purpose |
 | --- | --- |
 | http-request-attributes method &rest option-list | Return request attributes for method, route, URL, scheme, addresses/ports, user agent, body size, and protocol version. |
-| http-response-attributes status &rest option-list | Return response attributes for status and body size. |
+| http-response-attributes status &rest option-list | Return response attributes for status and body size. The body size option is :response-body-size; the undocumented :body-size alias was removed in 1.0.0. |
 | span-set-http-request span method &rest option-list | Attach request attributes to a span. |
 | span-set-http-response span status &rest option-list | Attach response attributes to a span. |
 
@@ -227,10 +227,11 @@ UNIT text.
 
 ### observability-kit/otlp
 
-Load cl-observability-kit/otlp for metric-snapshot->otlp, snapshot->otlp,
-registry->otlp, span-record->otlp, traces->otlp, log-record->otlp, and
-logs->otlp. These return deterministic Common Lisp alists shaped for an OTLP
-adapter. They do not encode JSON or protobuf, open a connection, or perform
+Load cl-observability-kit/otlp for metric-snapshot->otlp, registry->otlp,
+span-record->otlp, traces->otlp, log-record->otlp, and
+logs->otlp. snapshot->otlp is a compatibility spelling that accepts either a
+metric or a metric snapshot and delegates to metric-snapshot->otlp. These
+return deterministic Common Lisp alists shaped for an OTLP adapter. They do not encode JSON or protobuf, open a connection, or perform
 retries. Metric conversion accepts optional scope metadata; trace and log
 conversion preserves resource and instrumentation-scope data.
 

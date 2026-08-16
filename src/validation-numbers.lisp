@@ -9,9 +9,15 @@
   value)
 
 (defun %finite-float-p (value)
-  (and (= value value)
-       #+sbcl (not (sb-ext:float-infinity-p value))
-       #-sbcl t))
+  ;; `(= value value)` is the classic NaN test, but on x86-64 SBCL leaves the
+  ;; :invalid float trap enabled, so comparing a NaN signals
+  ;; FLOATING-POINT-INVALID-OPERATION instead of returning NIL: passing a NaN
+  ;; metric value raised a raw arithmetic error on Linux while returning a
+  ;; clean validation failure on aarch64-darwin, where the trap is masked.
+  ;; The bit-pattern predicates never trap, so both platforms agree.
+  #+sbcl (and (not (sb-ext:float-nan-p value))
+              (not (sb-ext:float-infinity-p value)))
+  #-sbcl (= value value))
 
 (defun %finite-real-p (value)
   (and (realp value)

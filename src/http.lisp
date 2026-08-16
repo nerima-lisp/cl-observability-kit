@@ -116,11 +116,9 @@ choose a client or server implementation."
      :allow-sensitive-names '("server.address" "client.address"))))
 
 (defun http-response-attributes (status &rest option-list)
-  "Return normalized HTTP response semantic-convention attributes.
-
-BODY-SIZE is accepted as a short alias for RESPONSE-BODY-SIZE."
+  "Return normalized HTTP response semantic-convention attributes."
   (let* ((options (%parse-keyword-options
-                   option-list '(:response-body-size :body-size)
+                   option-list '(:response-body-size)
                    "HTTP-RESPONSE-ATTRIBUTES"))
          (attributes (list (cons "http.response.status_code"
                                  (progn
@@ -132,24 +130,13 @@ BODY-SIZE is accepted as a short alias for RESPONSE-BODY-SIZE."
                                                              "HTTP status ~S is invalid."
                                                              status)))
                                    status)))))
-    (when (and (%option-supplied-p options :response-body-size)
-               (%option-supplied-p options :body-size))
-      (error 'http-error
-             :message "HTTP response body size was supplied more than once."))
-    (let ((body-size-key
-            (cond
-              ((%option-supplied-p options :response-body-size)
-               :response-body-size)
-              ((%option-supplied-p options :body-size)
-               :body-size))))
-      (when body-size-key
-        (let ((attribute-pair
-                (%http-number-attribute options
-                                        body-size-key
-                                        "http.response.body.size"
-                                        :size-p t)))
-          (when attribute-pair
-            (push attribute-pair attributes)))))
+    (let ((attribute-pair
+            (%http-number-attribute options
+                                    :response-body-size
+                                    "http.response.body.size"
+                                    :size-p t)))
+      (when attribute-pair
+        (push attribute-pair attributes)))
     (%normalize-attributes attributes)))
 
 (defun span-set-http-request (span method &rest option-list)

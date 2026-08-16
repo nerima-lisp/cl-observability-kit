@@ -45,11 +45,7 @@ character trace IDs and 16 character span IDs."
     (string-downcase
      (format nil "00-~A-~A-~2,'0X" trace-id span-id flags))))
 
-(defun parse-traceparent (header)
-  "Parse a W3C `traceparent` value into an instrumentation context.
-
-Only version 00 is accepted.  Invalid input signals INVALID-TRACEPARENT;
-the extraction boundary is intentionally tolerant and returns NIL instead."
+(defun %traceparent-fields (header)
   (unless (stringp header)
     (%propagation-error "TRACEPARENT must be a string." header))
   (let ((value (string-trim '(#\Space #\Tab) header)))
@@ -63,10 +59,21 @@ the extraction boundary is intentionally tolerant and returns NIL instead."
                  (%hex-string-p (subseq value 53 55) 2)
                  (not (string= (subseq value 53 55) "ff")))
       (%propagation-error "The W3C traceparent header is invalid." header))
+    (values (string-downcase (subseq value 3 35))
+            (string-downcase (subseq value 36 52))
+            (parse-integer (subseq value 53 55) :radix 16))))
+
+(defun parse-traceparent (header)
+  "Parse a W3C `traceparent` value into an instrumentation context.
+
+Only version 00 is accepted.  Invalid input signals INVALID-TRACEPARENT;
+the extraction boundary is intentionally tolerant and returns NIL instead."
+  (multiple-value-bind (trace-id span-id flags)
+      (%traceparent-fields header)
     (make-instrumentation-context
-     :trace-id (string-downcase (subseq value 3 35))
-     :span-id (string-downcase (subseq value 36 52))
-     :trace-flags (parse-integer (subseq value 53 55) :radix 16))))
+     :trace-id trace-id
+     :span-id span-id
+     :trace-flags flags)))
 
 (defun %baggage-key-p (key)
   (and (stringp key)
@@ -160,7 +167,11 @@ the extraction boundary is intentionally tolerant and returns NIL instead."
                               (not (%utf8-continuation-p
                                     (aref bytes (1+ index))))
                               (not (%utf8-continuation-p
-                                    (aref bytes (+ index 2)))))
+                                    (aref bytes (+ index 2))))
+                              (and (= first #xe0)
+                                   (< (aref bytes (1+ index)) #xa0))
+                              (and (= first #xed)
+                                   (>= (aref bytes (1+ index)) #xa0)))
                       (%propagation-error "A baggage value contains invalid UTF-8."))
                     (write-char
                      (code-char (+ (ash (logand first #x0f) 12)
@@ -175,7 +186,11 @@ the extraction boundary is intentionally tolerant and returns NIL instead."
                               (not (%utf8-continuation-p
                                     (aref bytes (+ index 2))))
                               (not (%utf8-continuation-p
-                                    (aref bytes (+ index 3)))))
+                                    (aref bytes (+ index 3))))
+                              (and (= first #xf0)
+                                   (< (aref bytes (1+ index)) #x90))
+                              (and (= first #xf4)
+                                   (>= (aref bytes (1+ index)) #x90)))
                       (%propagation-error "A baggage value contains invalid UTF-8."))
                     (write-char
                      (code-char (+ (ash (logand first #x07) 18)
@@ -289,26 +304,31 @@ baggage entries are replaced; unrelated entries are copied unchanged."
 Malformed traceparent values are ignored at this untrusted boundary.  A
 malformed optional baggage or tracestate value is ignored while preserving a
 valid traceparent context."
-  (let* ((normalized (%header-list headers))
-         (traceparent (%propagation-header normalized "traceparent")))
-    (when traceparent
-      (handler-case
-          (let* ((context (parse-traceparent traceparent))
-                 (tracestate (let ((value (%propagation-header normalized "tracestate")))
-                               (when value
-                                 (handler-case
-                                     (%validate-tracestate value)
-                                   (observability-error () nil)))))
-                 (baggage (let ((value (%propagation-header normalized "baggage")))
-                            (when value
-                              (handler-case
-                                  (parse-baggage value)
-                                (propagation-error () nil))))))
-            (make-instrumentation-context
-             :trace-id (instrumentation-context-trace-id context)
-             :span-id (instrumentation-context-span-id context)
-             :trace-flags (instrumentation-context-trace-flags context)
-             :baggage baggage
-             :tracestate tracestate
-             :remote-p t))
-        (propagation-error () nil)))))
+  (handler-case
+      (let* ((normalized (%header-list headers))
+             (traceparent (%propagation-header normalized "traceparent")))
+        (when traceparent
+          (handler-case
+              (multiple-value-bind (trace-id span-id flags)
+                  (%traceparent-fields traceparent)
+                (let ((tracestate
+                        (let ((value (%propagation-header normalized "tracestate")))
+                          (when value
+                            (handler-case
+                                (%validate-tracestate value)
+                              (observability-error () nil)))))
+                      (baggage
+                        (let ((value (%propagation-header normalized "baggage")))
+                          (when value
+                            (handler-case
+                                (parse-baggage value)
+                              (propagation-error () nil))))))
+                  (make-instrumentation-context
+                   :trace-id trace-id
+                   :span-id span-id
+                   :trace-flags flags
+                   :baggage baggage
+                   :tracestate tracestate
+                   :remote-p t)))
+            (propagation-error () nil))))
+    (propagation-error () nil)))

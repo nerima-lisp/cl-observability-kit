@@ -14,7 +14,7 @@
                     :user-agent "observability-test"
                     :request-body-size 12
                     :protocol-version "2"))
-          (response (http-response-attributes 201 :body-size 48)))
+          (response (http-response-attributes 201 :response-body-size 48)))
       (expect (cdr (assoc "http.request.method" request :test #'string=))
               :to-equal "GET")
       (expect (cdr (assoc "url.scheme" request :test #'string=))
@@ -77,5 +77,5 @@
       (http-response-attributes 200 :response-body-size "1"))
     (signals http-error
       (http-request-attributes :get :url (format nil "https://example.test/~C" #\Return)))
-    (signals http-error
-      (http-response-attributes 200 :body-size 1 :response-body-size 2))))
+    (signals observability-error
+      (http-response-attributes 200 :body-size 1))))

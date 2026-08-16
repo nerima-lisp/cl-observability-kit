@@ -11,7 +11,22 @@
         :test #'string=))
 
 (describe "OTLP-shaped export"
-  (it "preserves zero and exact Common Lisp values at the adapter boundary"
+  (it "marks up-down counters as non-monotonic sums"
+    (let* ((registry (make-metric-registry))
+           (counter (define-up-down-counter registry active_connections)))
+      (metric-inc counter 2)
+      (metric-inc counter -1)
+      (let* ((document (observability-kit/otlp:registry->otlp registry))
+             (metric (otlp-metric-by-name document "active_connections")))
+        (expect (string-alist-value "type" metric) :to-equal "sum")
+        (expect (string-alist-value "is-monotonic" metric)
+                :to-be-falsy)
+        (expect (cdr (assoc "value"
+                            (first (string-alist-value "data-points" metric))
+                            :test #'string=))
+                :to-equal 1))))
+
+  (it "preserves zero and exact Common Lisp values at the carrier boundary"
     (let* ((registry (make-metric-registry))
            (counter (define-counter registry zero_total))
            (gauge (define-gauge registry ratio))

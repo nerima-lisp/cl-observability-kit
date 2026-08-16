@@ -32,11 +32,14 @@
     (setf (cdr list) list)
     list))
 
-(defun edge-sample (name type &key (value nil value-supplied-p) (labels nil))
+(defun edge-sample (name type &key (value nil value-supplied-p) (labels nil)
+                                     (timestamp nil) (start-time nil))
   (declare (ignore name type))
   (observability-kit::%make-metric-sample
    labels
    (when value-supplied-p value)
    nil
    nil
-   nil))
+   nil
+   timestamp
+   start-time))

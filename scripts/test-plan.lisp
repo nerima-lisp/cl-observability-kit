@@ -7,16 +7,21 @@
 
 (defun assert-runnable-test-plan ()
   "Reject an empty or partially selected CL-WEAVE test plan."
-  (let ((plan (cl-weave:collect-test-plan (cl-weave:root-suite))))
+  (let ((plan (uiop:symbol-call '#:cl-weave '#:collect-test-plan
+                                (uiop:symbol-call '#:cl-weave '#:root-suite))))
     (unless plan
       (error "Test plan selection is empty."))
     (let ((non-runnable
             (remove-if (lambda (entry)
-                         (eq :run (cl-weave:test-plan-entry-status entry)))
+                         (eq :run
+                             (uiop:symbol-call '#:cl-weave
+                                               '#:test-plan-entry-status
+                                               entry)))
                        plan)))
       (when non-runnable
         (error "Test plan contains non-runnable entries: ~S"
-               (cl-weave:test-plan-facts non-runnable))))
+               (uiop:symbol-call '#:cl-weave '#:test-plan-facts
+                                 non-runnable))))
     (format t "~&Test plan: ~D runnable tests.~%" (length plan))
     plan))
 

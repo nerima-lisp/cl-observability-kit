@@ -1,5 +1,3 @@
-(require "asdf")
-
 #+sbcl
 (progn
   (require :sb-cover)
@@ -8,16 +6,25 @@
       (error "SB-COVER compiler policy is not available."))
     (proclaim `(optimize (,policy 3)))))
 
+(require "asdf")
+
 (defparameter *script-directory*
   (uiop:pathname-directory-pathname
    (or *load-truename* *default-pathname-defaults*)))
 
 (load (merge-pathnames "scripts/bootstrap.lisp" *script-directory*))
-(observability-kit.bootstrap:initialize-source-registry)
+(defparameter *project-root* (observability-kit.bootstrap:project-root))
+(observability-kit.bootstrap:initialize-source-registry
+ :root *project-root*
+ :ignore-inherited-configuration t)
+(format t "~&Loading cl-weave...~%")
+(finish-output)
 (asdf:load-system "cl-weave")
+(format t "~&Loading test plan...~%")
+(finish-output)
 (load (merge-pathnames "scripts/test-plan.lisp" *script-directory*))
 
-(let* ((root (observability-kit.bootstrap:initialize-source-registry))
+(let* ((root *project-root*)
        (report-directory (merge-pathnames "coverage-report/" root))
        (coverage-output (merge-pathnames "coverage.sexp" root))
        (coverage-excluded-files
@@ -61,17 +68,25 @@
                (format t "~&Coverage source policy: ~D source files, ~D excluded.~%"
                        (length coverage-source-pathnames)
                        (length coverage-exclude-pathnames))
+               (format t "~&Loading test system with coverage...~%")
+               (finish-output)
                ;; SB-COVER clears the source table as well as the execution
                ;; bits.  Reload the implementation systems after the reset
                ;; so optional exporters are part of the same measured run.
                (asdf:load-system "cl-observability-kit/test" :force t)
                (observability-kit.test-plan:assert-runnable-test-plan)
+               (format t "~&Resetting coverage...~%")
+               (finish-output)
                (cl-weave:reset-coverage)
+               (format t "~&Reloading implementation systems...~%")
+               (finish-output)
                (dolist (system '("cl-observability-kit"
                                   "cl-observability-kit/prometheus"
                                   "cl-observability-kit/otlp"
                                   "cl-observability-kit/log-kit"))
                  (asdf:load-system system :force t))
+               (format t "~&Running covered test plan...~%")
+               (finish-output)
                (let ((result
                        (cl-weave:run-all
                         :reporter :spec

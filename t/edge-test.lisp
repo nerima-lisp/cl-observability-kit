@@ -245,14 +245,19 @@
     (signals observability-error
       (observability-kit::%validate-positive-integer 1.5 "edge"))
     #+sbcl
-    (progn
+    (let ((nan (sb-int:with-float-traps-masked (:invalid)
+                 (/ 0.0d0 0.0d0))))
       (signals observability-error
         (observability-kit::%validate-finite-real
          sb-ext:double-float-positive-infinity "edge"))
-      (expect (observability-kit::%finite-real-p
-               (sb-int:with-float-traps-masked (:invalid)
-                 (/ 0.0d0 0.0d0)))
-              :to-be-falsy))))
+      (expect (observability-kit::%finite-real-p nan) :to-be-falsy)
+      (signals observability-error
+        (observability-kit::%validate-finite-real nan "edge"))
+      ;; A NaN has to reach the public boundary as a validation failure. On
+      ;; x86-64 the :invalid float trap is enabled, so a NaN comparison inside
+      ;; the validator escaped as FLOATING-POINT-INVALID-OPERATION instead.
+      (let ((gauge (define-gauge (make-metric-registry) edge_nan_gauge)))
+        (signals metric-operation-error (metric-set gauge nan))))))
 
 (describe "optional exporter boundaries"
   (it "renders exact numbers, source shapes, and defensive errors"
@@ -416,6 +421,8 @@
         (expect (observability-kit/otlp:metric-snapshot->otlp
                  (first (metric-snapshot registry)))
                 :to-be-truthy)
+        (expect (observability-kit/otlp:metric-snapshot->otlp (metric-snapshot histogram))
+                :to-be-truthy)
         (expect (observability-kit/otlp:snapshot->otlp histogram) :to-be-truthy)
         (expect (observability-kit/otlp:snapshot->otlp (metric-snapshot histogram))
                 :to-be-truthy)
@@ -434,7 +441,25 @@
                  :count 2
                  :sum 3)))
           (expect (cdr (assoc "count" data-point :test #'string=)) :to-equal 2)
-          (expect (cdr (assoc "sum" data-point :test #'string=)) :to-equal 3)))
+          (expect (cdr (assoc "sum" data-point :test #'string=)) :to-equal 3))
+        (let* ((sample (edge-sample "edge" :histogram
+                                    :timestamp 10
+                                    :start-time 5))
+               (snapshot (observability-kit::make-metric-snapshot
+                          :name "edge_histogram"
+                          :help "edge"
+                          :type :histogram
+                          :samples (list sample)))
+               (metric (observability-kit/otlp:metric-snapshot->otlp
+                        snapshot))
+               (data-point (first (cdr (assoc "data-points" metric
+                                              :test #'string=)))))
+          (expect (cdr (assoc "timestamp" data-point :test #'string=))
+                  :to-equal 10)
+          (expect (cdr (assoc "start-time" data-point :test #'string=))
+                  :to-equal 5)))
+      (signals observability-error
+               (observability-kit/otlp:metric-snapshot->otlp :not-a-metric))
       (signals observability-error
         (observability-kit/otlp:snapshot->otlp :not-a-metric))
       (signals observability-error

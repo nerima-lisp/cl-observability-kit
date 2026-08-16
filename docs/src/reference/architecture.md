@@ -76,9 +76,9 @@ The source layout keeps the primary data model separate from operations:
 - health-macros.lisp provides the macro-first health definition API.
 - resource-declarations.lisp and resource.lisp define immutable resource
   metadata shared by metric, trace, and log records.
-- trace-model.lisp and trace-operation.lisp define tracer providers,
-  instrumentation scopes, samplers, spans, lifecycle callbacks, and detached
-  span records.
+- trace-model.lisp defines tracer and span data; trace-provider.lisp exposes
+  provider and processor operations; trace-operation.lisp handles span
+  lifecycle callbacks; trace-records.lisp exposes detached span records.
 - propagation.lisp formats and validates W3C traceparent, tracestate, and
   baggage values without performing I/O.
 - propagator.lisp composes propagation adapters.
@@ -94,8 +94,9 @@ The source layout keeps the primary data model separate from operations:
 - prometheus-source.lisp selects and snapshots exporter input.
 - prometheus-format.lisp normalizes numbers and escapes exposition text.
 - prometheus-samples.lisp emits labels, samples, and histogram buckets.
-- otlp.lisp converts detached metric, span, and log records to deterministic
-  OTLP-shaped Common Lisp data.
+- otlp.lisp contains shared OTLP document helpers; otlp-metrics.lisp,
+  otlp-traces.lisp, and otlp-logs.lisp convert detached data by signal to
+  deterministic OTLP-shaped Common Lisp data.
 
 Metric definitions are macros because names and options are configuration, not
 runtime input. define-counter, define-gauge, and define-histogram reject

@@ -52,10 +52,10 @@ not serialize or send a wire payload.
 There is no Quicklisp or Ultralisp distribution; install by making a git
 checkout visible to ASDF.
 
-For a reproducible pin, check out the `v0.1.0` tag:
+For a reproducible pin, check out the `v1.0.0` tag:
 
 ~~~sh
-git clone --branch v0.1.0 https://github.com/nerima-lisp/cl-observability-kit.git
+git clone --branch v1.0.0 https://github.com/nerima-lisp/cl-observability-kit.git
 ~~~
 
 For the current development source, check out `main` instead:
@@ -80,6 +80,7 @@ the checkout.
 - [API reference](docs/src/reference/api.md)
 - [Architecture](docs/src/reference/architecture.md)
 - [Development](docs/src/project/development.md)
+- [Changelog](CHANGELOG.md)
 
 ## Development
 
@@ -102,6 +103,7 @@ artifact policy.
 
 Keep the core transport-neutral and update the documentation when public
 semantics change. Run the checks above before opening an issue or pull request.
+CI runs nix flake check on every pull request.
 
 ## Support
 
@@ -110,4 +112,4 @@ for reproducible bugs and feature discussions.
 
 ## License
 
-MIT, as declared by cl-observability-kit.asd.
+MIT. See [LICENSE](LICENSE); cl-observability-kit.asd declares the same.

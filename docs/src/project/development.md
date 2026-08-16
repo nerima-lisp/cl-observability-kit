@@ -20,9 +20,24 @@ supported systems. The direct SBCL scripts are useful when diagnosing ASDF
 or test-runner behavior. The test system uses cl-weave and rejects an empty
 or partially non-runnable test selection.
 
-The Nix shell provides the pinned paredit-cli executable as paredit for
-read-only structural validation and analysis. Keep generated build output and
-coverage artifacts out of the repository.
+The Nix shell provides the pinned `paredit-cli` package; its executable is
+`paredit`. Use it for read-only structural validation and analysis. Keep
+generated build output and coverage artifacts out of the repository.
+
+## Continuous integration
+
+Four GitHub Actions workflows share one `nix-setup` composite action, which is
+the single place the Nix installer and Cachix action revisions are pinned:
+
+| Workflow | Trigger | What it enforces |
+| --- | --- | --- |
+| ci.yml | push to main, pull request | `nix flake check` and `git diff --check` |
+| docs.yml | push to main touching docs or the flake | Builds `.#docs` and publishes it to GitHub Pages |
+| release.yml | push of a `v*.*.*` tag | The tag matches every `:version` in the .asd, `nix flake check` passes on the tagged tree, then a draft release is opened |
+| flake-update.yml | weekly, or manual dispatch | Proposes a `flake.lock` update as a pull request |
+
+CI runs on Linux only. The flake declares `aarch64-darwin` as well, and that
+attribute set is covered by developers running the commands above locally.
 
 ## Test and coverage boundary
 
@@ -104,7 +119,7 @@ model, registry, thread, and execution files; context, resource, trace,
 trace processors, sampler, propagation, structured-log, log SDK,
 configuration, and HTTP semantic-convention files. Prometheus source
 selection, formatting, and sample emission are separate files, as are OTLP
-conversion and the optional cl-log-kit bridge.
+common helpers, signal-specific conversion, and the optional cl-log-kit bridge.
 
 Tests live in t/ and are loaded through the cl-observability-kit/test system.
 Metric SDK and periodic lifecycle contracts live beside trace SDK, trace
