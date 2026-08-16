@@ -23,6 +23,15 @@ shipped without.
 
 ### Fixed
 
+- NaN rejection no longer depends on the platform's float-trap mask. The
+  internal finite-value predicate tested for NaN with `(= value value)`, and
+  x86-64 SBCL leaves the `:invalid` trap enabled, so the comparison signalled
+  `floating-point-invalid-operation` instead of returning false. Every public
+  validator funnels through that predicate, so on Linux a NaN metric value,
+  span attribute, log timestamp, or sampler ratio escaped as a raw arithmetic
+  error rather than the documented `observability-error`, while the same call
+  returned a clean validation failure on aarch64-darwin. The predicate now
+  reads the bit pattern via `sb-ext:float-nan-p`.
 - Restored five exported symbols that the SDK component split dropped from the
   package definitions while leaving their definitions, their internal callers,
   and their documentation in place: `metric-reader-force-flush`,

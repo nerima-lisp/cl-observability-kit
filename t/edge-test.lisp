@@ -245,14 +245,19 @@
     (signals observability-error
       (observability-kit::%validate-positive-integer 1.5 "edge"))
     #+sbcl
-    (progn
+    (let ((nan (sb-int:with-float-traps-masked (:invalid)
+                 (/ 0.0d0 0.0d0))))
       (signals observability-error
         (observability-kit::%validate-finite-real
          sb-ext:double-float-positive-infinity "edge"))
-      (expect (observability-kit::%finite-real-p
-               (sb-int:with-float-traps-masked (:invalid)
-                 (/ 0.0d0 0.0d0)))
-              :to-be-falsy))))
+      (expect (observability-kit::%finite-real-p nan) :to-be-falsy)
+      (signals observability-error
+        (observability-kit::%validate-finite-real nan "edge"))
+      ;; A NaN has to reach the public boundary as a validation failure. On
+      ;; x86-64 the :invalid float trap is enabled, so a NaN comparison inside
+      ;; the validator escaped as FLOATING-POINT-INVALID-OPERATION instead.
+      (let ((gauge (define-gauge (make-metric-registry) edge_nan_gauge)))
+        (signals metric-operation-error (metric-set gauge nan))))))
 
 (describe "optional exporter boundaries"
   (it "renders exact numbers, source shapes, and defensive errors"
