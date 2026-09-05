@@ -16,13 +16,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # One job on purpose. Granularity belongs in the flake's `checks.*`
-  # attributes, which `nix flake check` evaluates in parallel with build
-  # caching. Splitting these into separate GitHub jobs would duplicate that
-  # scheduling and lose cache sharing between them.
-  #
-  # Add a second job ONLY for work the Nix sandbox cannot do: network access,
-  # a real PTY/TTY, or artifact upload.
+  # Keep one GitHub job: nix flake check schedules declared checks together and
+  # shares build cache. Add jobs only for work outside the Nix sandbox.
   check:
     name: nix flake check
     runs-on: ubuntu-latest
@@ -40,15 +35,8 @@ jobs:
           cachix-cache: ${{ vars.CACHIX_CACHE }}
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-      # Runs the three checks the flake declares: the cl-weave suite
-      # (checks.default), the treefmt formatting gate (checks.formatting), and
-      # the mkdocs --strict build (checks.docs).
-      #
-      # `--all-systems` is deliberately NOT passed even though flake.nix
-      # declares aarch64-darwin alongside x86_64-linux: the darwin
-      # derivations cannot be built on a Linux runner, so the flag would only
-      # add evaluation work the job cannot act on. The darwin attribute set is
-      # covered by developers building locally on that platform.
+      # nix flake check runs the suite, formatting gate, and strict documentation
+      # build. Do not pass --all-systems: Linux cannot build the Darwin derivations.
       - name: Check flake
         run: nix flake check --print-build-logs
 

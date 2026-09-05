@@ -6,11 +6,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [1.0.0] - 2026-08-16
 
-First stable release. 1.0.0 marks the substrate as production-ready rather
-than announcing a redesign: every public operation from 0.1.0 keeps its name,
-signature, and behavior apart from the single removal listed below. The
-release also completes the project's release infrastructure, which 0.1.0
-shipped without.
+First stable release. Public operations retain their 0.1.0 names, signatures,
+and behavior apart from the removal listed below. This release also adds the
+release infrastructure that 0.1.0 lacked.
 
 ### Removed
 

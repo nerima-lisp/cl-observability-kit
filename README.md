@@ -84,25 +84,15 @@ the checkout.
 
 ## Development
 
-~~~sh
-nix develop
-nix run .#test
-sbcl --script run-tests.lisp
-sbcl --script run-coverage.lisp
-nix flake check
-nix build .#docs
-nix fmt
-~~~
-
-Tests live in t/ and use cl-weave. The coverage runner requires 100%
-expression and branch coverage for its explicit runtime boundary; see the
-[development guide](docs/src/project/development.md) for the exclusions and
-artifact policy.
+Use `nix develop` for the pinned development dependencies. See the
+[development guide](docs/src/project/development.md) for checks, coverage, and
+profiling.
 
 ## Contributing
 
 Keep the core transport-neutral and update the documentation when public
-semantics change. Run the checks above before opening an issue or pull request.
+semantics change. Run the checks in the development guide before opening an
+issue or pull request.
 CI runs nix flake check on every pull request.
 
 ## Support

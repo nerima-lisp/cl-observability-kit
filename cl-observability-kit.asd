@@ -1,17 +1,12 @@
 (in-package #:asdf-user)
 
 (asdf:defsystem "cl-observability-kit"
-  ;; All eight metadata fields are mandatory across the org: :homepage,
-  ;; :bug-tracker and :source-control are what let a consumer find the project
-  ;; from an ASDF listing alone.
   :description "A small, deterministic observability substrate for Common Lisp."
   :long-description "Metrics, health checks, readiness semantics, and instrumentation context without transport or route ownership."
   :author "takeokunn <bararararatty@gmail.com>"
   :maintainer "takeokunn <bararararatty@gmail.com>"
   :license "MIT"
-  ;; Single source of truth for the version; every system in this file repeats
-  ;; it because they are released together. flake.nix reads this form, and
-  ;; release.yml refuses to publish a tag that disagrees with it.
+  ;; Release tooling verifies that every system version and the Git tag agree.
   :version "1.0.0"
   :homepage "https://github.com/nerima-lisp/cl-observability-kit"
   :bug-tracker "https://github.com/nerima-lisp/cl-observability-kit/issues"

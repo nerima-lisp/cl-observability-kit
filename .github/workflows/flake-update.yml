@@ -23,18 +23,11 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # Reuse the shared installer wiring (Cachix self-skips with no cache set),
-      # keeping the nix-installer SHA pin in exactly one place.
+      # Reuse the shared setup so the installer SHA is pinned in one place.
       - uses: ./.github/actions/nix-setup
 
-      # Opens/refreshes a PR bumping every flake input. This is the mechanism
-      # that keeps the org's nixpkgs pins converged: without it they drift apart
-      # and no amount of manual alignment holds for more than a week.
-      #
-      # NOTE: this uses the default GITHUB_TOKEN, so GitHub will NOT trigger CI
-      # on the bot's PR (loop-prevention). Re-run CI by pushing an empty commit
-      # or closing and reopening the PR; swap in a PAT via `token:` if
-      # self-triggering CI is required.
+      # Update all flake inputs in one PR. The default GITHUB_TOKEN does not trigger
+      # CI for the bot's PR; provide a PAT via `token:` if self-triggering is required.
       - name: Update flake.lock
         uses: DeterminateSystems/update-flake-lock@834c491b2ece4de0bbd00d85214bb5e83b4da5c6 # v28
         with:

@@ -24,14 +24,7 @@ jobs:
         with:
           persist-credentials: false
 
-      # Enforces the org invariant "git tag == .asd :version" at the only point
-      # where it can still be corrected cheaply. Without this gate the two drift
-      # silently, which is how cl-boundary-kit reached :version 1.0.0 while its
-      # newest tag was still v0.6.0.
-      #
-      # This repository declares five systems in one .asd and every one of them
-      # carries the same :version, so the check reads all of them and fails on
-      # disagreement rather than trusting the first form.
+      # Keep the tag and all ASDF system versions synchronized.
       - name: Verify tag matches .asd version
         env:
           PACKAGE: cl-observability-kit
@@ -55,30 +48,10 @@ jobs:
           cachix-cache: ${{ vars.CACHIX_CACHE }}
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-      # Never publish a release that does not pass its own test suite.
       - name: Verify the tagged tree
         run: nix flake check --print-build-logs
 
-      # Creates the release as an empty draft. This workflow does not produce a
-      # release body at all; CHANGELOG.md holds the prepared notes and the
-      # maintainer fills the body in and publishes after this job goes green:
-      #
-      #   gh release edit "$GITHUB_REF_NAME" --notes-file <file> --draft=false
-      #
-      # `draft: true` is load-bearing. Publishing straight away would make "the
-      # maintainer forgot the notes" a user-visible state. A draft appears
-      # neither under "Latest release" nor in the default output of
-      # `gh release list`, so an unfinished release never reaches downstream.
-      #
-      # `generate_release_notes` is deliberately left off. Generated notes are a
-      # list of commit titles and PR numbers, and the notes are meant to be
-      # selected by "does a user of this package have to change their own code"
-      # — a judgement no generator can make.
-      #
-      # Every `uses:` in this org references a 40-character SHA, never a mutable
-      # tag. Re-resolve before bumping, and do not copy a SHA you have not
-      # resolved yourself:
-      #   gh api repos/softprops/action-gh-release/git/ref/tags/v2 --jq .object.sha
+      # Keep the release as a draft until the maintainer supplies the changelog.
       - name: Create draft release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
