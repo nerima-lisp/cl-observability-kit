@@ -35,6 +35,6 @@ worker is local; it does not perform network I/O.
 - [API reference](reference/api.md) — public packages, operations, conditions,
   configuration, readers, processors, and carriers.
 - [Architecture](reference/architecture.md) — ownership boundaries,
-  concurrency, lifecycle, security, and coverage policy.
+  concurrency, lifecycle, and security.
 - [Development](project/development.md) — tests, coverage, formatting, and
   documentation checks.
