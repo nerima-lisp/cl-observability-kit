@@ -44,11 +44,12 @@ attribute set is covered by developers running the commands above locally.
 run-tests.lisp bootstraps the local source registry, loads the test system,
 and runs the complete cl-weave suite. run-coverage.lisp uses SBCL coverage
 instrumentation and asks cl-weave for 100% expression and branch coverage.
-The executable runtime files are included explicitly; these declaration, fixed
-data, and macro-expansion files are excluded from runtime instrumentation:
+It includes every `src/*.lisp` file and excludes these declaration, fixed-data,
+condition, and macro-expansion files from runtime instrumentation:
 
 ~~~text
 src/package.lisp
+src/conditions.lisp
 src/validation-data.lisp
 src/metrics-declarations.lisp
 src/metrics-macros.lisp
@@ -62,7 +63,6 @@ src/trace-macros.lisp
 src/log-declarations.lisp
 src/log-kit-macros.lisp
 src/package-prometheus.lisp
-src/prometheus-data.lisp
 src/package-otlp.lisp
 src/package-log-kit.lisp
 ~~~

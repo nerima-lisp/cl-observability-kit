@@ -97,7 +97,7 @@ threads do not inherit a caller's dynamic context implicitly.
 
 | Operation | Purpose |
 | --- | --- |
-| make-tracer-provider &rest option-list | Create a provider with :resource, :clock, :id-generator, :sampler, :span-processors, :exporter, :flush, :shutdown, and :export-error-handler. |
+| make-tracer-provider &rest option-list | Create a provider with :resource, :clock, :monotonic-units-per-second, :id-generator, :sampler, :span-processors, :exporter, :flush, :shutdown, and :export-error-handler. |
 | make-tracer provider name &rest option-list | Create an instrumentation scope with optional :version and :schema-url. |
 | make-span-processor &rest option-list | Create lifecycle callbacks :on-start, :on-end, :force-flush, :shutdown, and :error-handler. |
 | make-simple-span-processor exporter &rest option-list | Create a synchronous processor. The exporter receives one sampled, detached span record in a proper list; optional callbacks are :flush, :shutdown, and :error-handler. |
@@ -106,6 +106,9 @@ threads do not inherit a caller's dynamic context implicitly.
 | start-span tracer name &rest option-list | Start a span with :parent, :kind, :attributes, and :start-time. :parent defaults to the current span. |
 | end-span span &rest option-list | End a span with :end-time, :status, and :status-message. |
 | with-span (variable tracer name &rest options) &body body | Bind a span/context, record errors as exceptions, and end the span on every exit path. |
+| span-record-start-monotonic record | Return the provider clock's monotonic reading captured when the span started. |
+| span-record-end-monotonic record | Return the provider clock's monotonic reading captured when the span ended. |
+| span-record-monotonic-units-per-second record | Return the provider's monotonic clock scale in units per second. |
 | make-trace-id-ratio-sampler ratio | Make a deterministic ratio sampler for a value in the range 0 through 1. |
 | make-parent-based-sampler root-sampler | Preserve a valid parent decision and apply the root sampler when no parent decision exists. |
 | force-flush-tracer-provider, shutdown-tracer-provider | Invoke processor, exporter, and provider lifecycle callbacks. |
@@ -117,6 +120,11 @@ argument contract: parent context, operation name, span kind, and attributes.
 The built-in ratio sampler also uses the candidate trace ID for deterministic
 decisions.
 
+The monotonic start and end readings and their units-per-second scale come
+from the same tracer-provider clock. Subtract the start reading from the end
+reading and divide by the scale to obtain seconds. Compare readings across
+records only when they share the same provider clock.
+
 Built-in processors export sampled records only. The simple processor invokes
 its exporter synchronously. The batch processor preserves completion order,
 exports partial batches after its schedule delay, drops new records when its
@@ -125,6 +133,9 @@ shutdown; shutdown also joins its local worker. Set :start to nil for lazy
 startup. Install these processors through :span-processors. Processor
 callbacks receive detached proper lists and do not encode or send a wire
 format.
+When a built-in processor exports spans, leave the provider's direct
+:exporter option unset. Setting both export paths delivers each sampled record
+twice.
 
 ## Structured logs
 
@@ -172,8 +183,8 @@ OTEL_METRIC_EXPORT_TIMEOUT, OTEL_TRACES_SAMPLER,
 OTEL_TRACES_SAMPLER_ARG, and OTEL_LOG_LEVEL. The metric interval and timeout
 are returned in seconds; defaults are 60 seconds and 30 seconds.
 
-Supported propagator tokens are tracecontext, baggage, b3, b3multi, and none.
-The default is tracecontext,baggage. Supported local sampler
+Supported propagator tokens are tracecontext, baggage, b3, b3multi, jaeger,
+xray, and none. The default is tracecontext,baggage. Supported local sampler
 tokens are always_on, always_off, traceidratio, parentbased_always_on,
 parentbased_always_off, and parentbased_traceidratio. Invalid or conflicting
 propagator or sampler selections signal configuration-error; malformed ratio
@@ -191,9 +202,10 @@ implemented by the application or an integration package.
 | format-traceparent context / parse-traceparent header | Format or validate a W3C traceparent value. |
 | format-baggage context / parse-baggage header | Format or parse normalized W3C baggage members. |
 | inject-trace-context context headers / extract-trace-context headers | Inject or extract W3C Trace Context and Baggage. |
-| make-w3c-propagator | Create the W3C carrier. |
-| make-composite-propagator &rest propagators | Try carriers in order for extraction and inject through all carriers. |
-| make-b3-propagator / make-b3-multi-propagator | Use B3 single or multi-header carriers. |
+| make-w3c-propagator | Return a propagator object for W3C Trace Context and Baggage. |
+| make-composite-propagator &rest propagators | Return a propagator that composes the supplied propagator objects in order. Extraction returns the first context found; injection passes headers through each propagator. |
+| make-b3-propagator / make-b3-multi-propagator | Return propagator objects for the B3 single-header or multi-header form. |
+| make-jaeger-propagator / make-xray-propagator | Return propagator objects for the public Jaeger compatibility or AWS X-Ray format. The Jaeger propagator is deprecated. |
 | propagator-inject / propagator-extract | Apply a selected propagator to a header alist and context. |
 
 Propagation never performs I/O. Headers are copied before injection and

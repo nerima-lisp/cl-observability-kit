@@ -10,7 +10,7 @@ logger handlers or sinks, wire encoding, or deployment policy.
 
 | System | Owns | Does not own |
 | --- | --- | --- |
-| cl-observability-kit | metric instruments and aggregation, readers, periodic collection, health semantics, cancellation tokens, resources, context, sampler decisions, tracer/provider/span lifecycle, structured logs, synchronous and bounded batch span processors, W3C and carrier propagation, HTTP semantic conventions, environment parsing | HTTP I/O, logger handlers and sinks, wire encoding, network I/O, network exporter queues and retries |
+| cl-observability-kit | metric instruments and aggregation, readers, periodic collection, health semantics, cancellation tokens, resources, context, sampler decisions, tracer/provider/span lifecycle, structured logs, synchronous and bounded batch span processors, W3C Trace Context and Baggage, B3, Jaeger, and AWS X-Ray propagation, HTTP semantic conventions, environment parsing | HTTP I/O, logger handlers and sinks, wire encoding, network I/O, network exporter queues and retries |
 | cl-observability-kit/prometheus | deterministic Prometheus text rendering and escaping | an HTTP server or /metrics route |
 | cl-observability-kit/otlp | deterministic OTLP-shaped Common Lisp data | JSON/protobuf encoding, an OTLP client, export retries |
 | cl-observability-kit/log-kit | explicit context-field mapping to cl-log-kit | log records, handlers, sinks, formatting, span lifecycle |
@@ -50,6 +50,11 @@ preserves completion order, can emit partial batches after a delay, drops new
 records when full, and drains during force-flush or shutdown. It is not a
 serializer or network client.
 
+A tracer provider accepts a direct `:exporter` callback in addition to
+registered span processors. These are separate export paths. When a built-in
+processor exports spans, leave the provider's `:exporter` unset to avoid
+delivering each sampled record twice.
+
 ## Data and source layout
 
 The source layout keeps the primary data model separate from operations:
@@ -81,8 +86,9 @@ The source layout keeps the primary data model separate from operations:
   lifecycle callbacks; trace-records.lisp exposes detached span records.
 - propagation.lisp formats and validates W3C traceparent, tracestate, and
   baggage values without performing I/O.
-- propagator.lisp composes propagation carriers.
-- propagation-carriers.lisp implements B3 single- and multi-header carriers.
+- propagator.lisp defines propagator objects and composes them.
+- propagation-adapters.lisp implements propagators for B3 single- and
+  multi-header formats, Jaeger, and AWS X-Ray.
 - configuration.lisp parses validated SDK environment settings.
 - log-operation.lisp and log-sdk.lisp create detached structured log records,
   providers, processors, and logger scopes.
@@ -134,10 +140,10 @@ preserves a valid parent decision and delegates root spans to its configured
 root sampler. Custom sampler callbacks use the four-argument API.
 
 The default propagator is W3C Trace Context plus W3C Baggage. The core also
-provides B3 single-header and B3 multi-header carriers, plus a composite
-propagator. Carrier injection and extraction operate on
-detached header alists and never perform I/O. Applications own carrier
-transport, trust policy, and redaction.
+provides B3 single-header and B3 multi-header carriers, deprecated Jaeger
+compatibility, AWS X-Ray, and a composite propagator. Carrier injection and
+extraction operate on detached header alists and never perform I/O.
+Applications own carrier transport, trust policy, and redaction.
 
 ## Health execution
 
@@ -175,11 +181,17 @@ timestamp and observed timestamp, normalized severity text and number,
 body, optional event name, attributes, context, resource, and
 instrumentation-scope metadata. OTLP conversion maps these fields and
 preserves resource and instrumentation-scope metadata in deterministic Common
-Lisp data. Ending a recorded span invokes the configured processor/export
-callbacks; explicit flush and shutdown callbacks provide lifecycle boundaries.
+Lisp data. Ending a recorded span invokes each configured processor's end
+callback; the provider's direct exporter receives sampled records only.
+Explicit flush and shutdown callbacks provide lifecycle boundaries.
 The built-in batch processor may start one local worker and keeps its queue
 bounded, but none of these operations starts an HTTP client/server, opens a
 connection, or performs network I/O.
+
+Span records also retain monotonic start and end readings and the provider
+clock scale. Subtract the start reading from the end reading and divide by the
+scale to obtain seconds. Compare readings across records only when they share
+the same provider clock.
 
 The configuration parser accepts explicit environment alists and validates
 SDK disabled state, service/resource metadata, propagator selection, metric

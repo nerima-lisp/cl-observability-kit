@@ -16,10 +16,12 @@ sinks, wire encoders, and network exporters.
 
 ## Boundaries
 
-There is intentionally no HTTP client or server in the core. /metrics,
-/health, /ready, and /live routes, HTTP server lifecycle, and framework
-carriers belong to the application boundary. The HTTP API in the core only
-validates and attaches semantic-convention attributes to an existing span.
+There is intentionally no HTTP client or server in the core. Routes such as
+/metrics, /health, /ready, and /live, HTTP server lifecycle, and
+framework-specific header containers belong to the application boundary. Core
+propagation APIs operate on detached header alists. The HTTP API in the core
+only validates and attaches semantic-convention attributes to an existing
+span.
 
 Providers, processors, readers, and exporters use callbacks and detached
 records. They define lifecycle and error boundaries without selecting a
@@ -33,7 +35,8 @@ worker is local; it does not perform network I/O.
 - [Getting started](getting-started.md) — load the systems and build the
   first metric, provider, span, log record, or propagation boundary.
 - [API reference](reference/api.md) — public packages, operations, conditions,
-  configuration, readers, processors, and carriers.
+  configuration, readers, processors, carriers, and detached monotonic span
+  timing.
 - [Architecture](reference/architecture.md) — ownership boundaries,
   concurrency, lifecycle, and security.
 - [Development](project/development.md) — tests, coverage, formatting, and

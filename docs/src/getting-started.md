@@ -10,7 +10,7 @@ cl-observability-kit.asd, or enter the Nix development shell:
 nix develop
 ~~~
 
-Pin to the `v1.0.0` tag for a reproducible checkout, or use `main` for the
+Pin to the `v1.1.0` tag for a reproducible checkout, or use `main` for the
 current development source. There is no Quicklisp or Ultralisp distribution;
 installation is a git checkout made visible to ASDF.
 
@@ -197,6 +197,11 @@ condition as an exception on error, and ends the span on every exit path. Use
 detached parent. Samplers can drop a span, record it without sampling, or
 record and sample it.
 
+Detached span records retain the start and end readings from the provider's
+monotonic clock and the units-per-second scale used by that provider. Subtract
+the start reading from the end reading and divide by the scale to get seconds.
+Compare readings across records only when they share the same provider clock.
+
 The built-in local sampler configuration supports always_on, always_off,
 traceidratio, parentbased_always_on, parentbased_always_off, and
 parentbased_traceidratio. The ratio sampler validates a value in the closed
@@ -242,6 +247,9 @@ batch for an exporter failure, or `nil` for a worker lifecycle failure).
 Install these processors through `:span-processors`.
 Both built-in processors invoke application callbacks only. Serialization,
 retry policy, and network I/O remain integration responsibilities.
+When a built-in processor exports spans, leave the provider's direct
+`:exporter` unset. Setting both export paths delivers each sampled record
+twice.
 
 ## Emit structured logs
 
@@ -295,7 +303,8 @@ propagator are replaced:
 ~~~
 
 The default configuration is W3C Trace Context plus W3C Baggage. The
-propagation API also provides B3 single-header and B3 multi-header carriers:
+propagation API also provides B3 single-header, B3 multi-header, Jaeger, and
+AWS X-Ray carriers. The Jaeger carrier is deprecated:
 
 ~~~lisp
 (let ((b3 (observability-kit:make-b3-propagator)))
@@ -330,7 +339,7 @@ configuration deterministic in tests and in application startup:
 The parser covers SDK disabled state, service name, resource attributes,
 propagator selection, metric export interval and timeout, local trace sampler,
 sampler argument, and log level. Supported propagator tokens are
-tracecontext, baggage, b3, b3multi, and none. Unsupported or
+tracecontext, baggage, b3, b3multi, jaeger, xray, and none. Unsupported or
 conflicting propagator or sampler selections signal configuration-error;
 invalid ratio arguments use the documented default instead of being evaluated
 as code.
@@ -353,5 +362,5 @@ Load cl-observability-kit/otlp when an application needs OTLP-shaped data:
 (observability-kit/otlp:logs->otlp log-records)
 ~~~
 
-These functions return deterministic Common Lisp alists for a carrier. They
+These functions return deterministic Common Lisp alists for an OTLP adapter. They
 do not perform serialization, retries, batching, or network I/O.

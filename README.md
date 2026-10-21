@@ -9,8 +9,10 @@ The SDK layer includes synchronous and observable metric instruments, detached
 snapshots, readers, periodic collection, tracer and meter providers, span and
 log processors, synchronous and bounded batch span processors, samplers,
 lifecycle callbacks, and a validated environment configuration parser.
-Propagation carriers cover W3C Trace Context and Baggage, B3, and B3
-multi-header carriers.
+Detached span records expose monotonic start and end readings with the scale
+used by their provider clock. Propagation carriers cover W3C Trace Context and
+Baggage, B3 single and multi-header, deprecated Jaeger compatibility, and
+AWS X-Ray.
 
 The transport boundary is deliberate. Applications and integration packages
 own HTTP clients and servers, logger sinks, wire encoding, transport-level
@@ -52,10 +54,10 @@ not serialize or send a wire payload.
 There is no Quicklisp or Ultralisp distribution; install by making a git
 checkout visible to ASDF.
 
-For a reproducible pin, check out the `v1.0.0` tag:
+For a reproducible pin, check out the `v1.1.0` tag:
 
 ~~~sh
-git clone --branch v1.0.0 https://github.com/nerima-lisp/cl-observability-kit.git
+git clone --branch v1.1.0 https://github.com/nerima-lisp/cl-observability-kit.git
 ~~~
 
 For the current development source, check out `main` instead:
