@@ -295,8 +295,11 @@
    #:span-record-name
    #:span-record-kind
    #:span-record-start-time
+   #:span-record-start-monotonic
    #:span-record-end-time
+   #:span-record-end-monotonic
    #:span-record-duration
+   #:span-record-monotonic-units-per-second
    #:span-record-status
    #:span-record-status-message
    #:span-record-trace-flags

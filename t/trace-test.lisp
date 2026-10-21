@@ -341,3 +341,86 @@
       (shutdown-tracer-provider provider)
       (signals tracer-provider-shutdown
         (make-tracer provider "after-shutdown")))))
+
+(describe "detached record monotonic timing"
+  (it "keeps exact monotonic ticks and existing wall-clock durations"
+    (let* ((records nil)
+           (clock (cl-boundary-kit:make-fake-clock
+                   :start 100
+                   :monotonic-start 200))
+           (provider (make-tracer-provider
+                      :clock clock
+                      :monotonic-units-per-second 10
+                      :exporter (lambda (record) (push record records))))
+           (tracer (make-tracer provider "monotonic"))
+           (root (start-span tracer "root" :parent nil)))
+      (cl-boundary-kit:advance-fake-clock clock 2 :monotonic-delta 3)
+      (let ((child (start-span tracer "child" :parent root)))
+        (cl-boundary-kit:advance-fake-clock clock 3 :monotonic-delta 4)
+        (end-span child)
+        (cl-boundary-kit:advance-fake-clock clock 1 :monotonic-delta 8)
+        (end-span root)
+        (let ((root-record (first records))
+              (child-record (second records)))
+          (expect (span-record-name child-record) :to-equal "child")
+          (expect (span-record-name root-record) :to-equal "root")
+          (expect (span-record-parent-span-id child-record)
+                  :to-equal (span-record-span-id root-record))
+
+          (expect (span-record-start-monotonic root-record) :to-equal 200)
+          (expect (span-record-start-monotonic child-record) :to-equal 203)
+          (expect (span-record-end-monotonic child-record) :to-equal 207)
+          (expect (span-record-end-monotonic root-record) :to-equal 215)
+          (expect (span-record-monotonic-units-per-second root-record)
+                  :to-equal 10)
+          (expect (span-record-monotonic-units-per-second child-record)
+                  :to-equal 10)
+          (expect (<= (span-record-start-monotonic root-record)
+                      (span-record-start-monotonic child-record)
+                      (span-record-end-monotonic child-record)
+                      (span-record-end-monotonic root-record))
+                  :to-be-truthy)
+
+          (expect (span-start-time root) :to-equal 100)
+          (expect (span-start-time child) :to-equal 102)
+          (expect (span-end-time child) :to-equal 105)
+          (expect (span-end-time root) :to-equal 106)
+          (expect (span-record-start-time root-record) :to-equal 100)
+          (expect (span-record-start-time child-record) :to-equal 102)
+          (expect (span-record-end-time child-record) :to-equal 105)
+          (expect (span-record-end-time root-record) :to-equal 106)
+
+          (expect (span-duration child) :to-equal 2/5)
+          (expect (span-duration root) :to-equal 3/2)
+          (expect (span-record-duration child-record) :to-equal 2/5)
+          (expect (span-record-duration root-record) :to-equal 3/2)
+          (expect (>= (span-record-duration child-record) 0) :to-be-truthy)
+          (expect (>= (span-record-duration root-record) 0) :to-be-truthy)))))
+
+  (it-property "keeps generated detached durations nonnegative"
+      ((start-tick (gen-integer :min 0 :max 1000))
+       (tick-delta (gen-integer :min 1 :max 1000))
+       (rate (gen-integer :min 1 :max 100)))
+    (let* ((records nil)
+           (clock (cl-boundary-kit:make-fake-clock
+                   :start 0
+                   :monotonic-start start-tick))
+           (provider (make-tracer-provider
+                      :clock clock
+                      :monotonic-units-per-second rate
+                      :exporter (lambda (record) (push record records))))
+           (tracer (make-tracer provider "monotonic-property"))
+           (span (start-span tracer "generated" :parent nil)))
+      (cl-boundary-kit:advance-fake-clock clock 0
+                                          :monotonic-delta tick-delta)
+      (end-span span)
+      (let ((record (first records)))
+        (expect (length records) :to-equal 1)
+        (expect (span-record-start-monotonic record) :to-equal start-tick)
+        (expect (span-record-end-monotonic record)
+                :to-equal (+ start-tick tick-delta))
+        (expect (span-record-monotonic-units-per-second record)
+                :to-equal rate)
+        (expect (span-record-duration record)
+                :to-equal (/ tick-delta rate))
+        (expect (>= (span-record-duration record) 0) :to-be-truthy)))))

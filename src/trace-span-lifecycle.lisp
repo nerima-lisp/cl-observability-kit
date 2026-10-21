@@ -9,8 +9,10 @@
 (defun %make-span-record-from-span (span end-time end-monotonic status message)
   (let* ((provider (%span-provider span))
          (tracer (%span-tracer span))
+         (monotonic-units-per-second
+           (%tracer-provider-monotonic-units-per-second provider))
          (duration (/ (- end-monotonic (%span-start-monotonic span))
-                      (%tracer-provider-monotonic-units-per-second provider))))
+                      monotonic-units-per-second)))
     (%make-span-record
      (%span-trace-id span)
      (%span-span-id span)
@@ -31,7 +33,10 @@
      (tracer-provider-resource provider)
      (tracer-name tracer)
      (tracer-version tracer)
-     (tracer-schema-url tracer))))
+     (tracer-schema-url tracer)
+     (%span-start-monotonic span)
+     end-monotonic
+     monotonic-units-per-second)))
 
 (defun %record-export-error (provider condition record)
   (let ((handler nil))

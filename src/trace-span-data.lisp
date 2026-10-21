@@ -39,6 +39,18 @@
       (/ (- (%span-end-monotonic span) (%span-start-monotonic span))
          (%tracer-provider-monotonic-units-per-second (%span-provider span))))))
 
+(defun span-record-start-monotonic (record)
+  (check-type record span-record)
+  (%span-record-start-monotonic record))
+
+(defun span-record-end-monotonic (record)
+  (check-type record span-record)
+  (%span-record-end-monotonic record))
+
+(defun span-record-monotonic-units-per-second (record)
+  (check-type record span-record)
+  (%span-record-monotonic-units-per-second record))
+
 (defun span-status (span)
   (check-type span span)
   (%span-status span))

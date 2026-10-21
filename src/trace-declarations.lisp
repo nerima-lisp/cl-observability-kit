@@ -93,7 +93,9 @@
                 (trace-id span-id parent-span-id name kind start-time
                  end-time duration status status-message trace-flags
                  sampled-p recording-p attributes events links resource
-                 tracer-name tracer-version tracer-schema-url))
+                 tracer-name tracer-version tracer-schema-url
+                 start-monotonic end-monotonic
+                 monotonic-units-per-second))
             (:conc-name %span-record-))
   trace-id
   span-id
@@ -114,7 +116,10 @@
   resource
   tracer-name
   tracer-version
-  tracer-schema-url)
+  tracer-schema-url
+  start-monotonic
+  end-monotonic
+  monotonic-units-per-second)
 
 (defvar *current-span* nil
   "Dynamically scoped current span, when a span scope is active.")
