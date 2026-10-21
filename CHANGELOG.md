@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.0] - 2026-10-22
+
+### Added
+
+- Added `span-record-start-monotonic`, `span-record-end-monotonic`, and
+  `span-record-monotonic-units-per-second` to expose detached span timing from
+  the provider clock.
+
 ## [1.0.0] - 2026-08-16
 
 First stable release. Public operations retain their 0.1.0 names, signatures,
